@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: db-true-lable
-        image: postgres:latest
+        image: postgres:17
         resources:
           requests:
             memory: "64Mi"
@@ -33,6 +33,8 @@ spec:
             value: postgres
           - name: POSTGRES_DB
             value: postgres
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
         volumeMounts: 
         - name: db-data
           mountPath: /var/lib/postgresql/data
