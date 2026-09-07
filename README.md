@@ -45,16 +45,20 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 ### Option A: Running Locally with Cargo
 
 1. **Navigate to the backend directory**:
+
    ```bash
    cd backend
    ```
 
 2. **Configure Environment Variables**:
    Copy `.env.local` to `.env`:
+
    ```bash
    cp .env.local .env
    ```
+
    *Default local configuration:*
+
    ```ini
    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
    REDIS_URL=redis://localhost:6379
@@ -64,17 +68,20 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
    ```
 
 3. **Run Postgres and Redis** (via Docker or native):
+
    ```bash
    docker run -d --name truelabel-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:latest
    docker run -d --name truelabel-redis -p 6379:6379 redis:latest
    ```
 
 4. **Run Backend Service**:
+
    ```bash
    cargo run
    ```
 
 5. **Verify Health**:
+
    ```bash
    curl http://localhost:8080/health
    curl http://localhost:8080/health/ready
@@ -85,11 +92,13 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 ### Option B: Running on Local Kubernetes (KinD)
 
 1. **Create the KinD Cluster**:
+
    ```bash
    kind create cluster --config .kind/local-cluster.yml --name true-lable-cluster
    ```
 
 2. **Apply Secrets, Persistent Volumes, and Services**:
+
    ```bash
    kubectl apply -f .kind/secrets/backend-secrets.yml
    kubectl apply -f .kind/deployment/db-init.yaml
@@ -99,18 +108,21 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
    ```
 
 3. **Build and Load Backend Docker Image**:
+
    ```bash
    docker build -t true-lable-backend:latest ./backend
    kind load docker-image true-lable-backend:latest --name true-lable-cluster
    ```
 
 4. **Deploy Backend**:
+
    ```bash
    kubectl apply -f .kind/deployment/backend-deployment.yml
    kubectl apply -f .kind/service/backend-service.yml
    ```
 
 5. **Verify Pod Status**:
+
    ```bash
    kubectl get pods -w
    ```
@@ -139,6 +151,7 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 ```
 
 ### Phase 0: MVP (Weeks 1–5)
+
 - **Goal**: Validate core flow.
 - Scan barcode → Lookup from Open Food Facts.
 - If not found → Show "Product not found".
@@ -148,6 +161,7 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 - **Success Metric**: 10 successful scans from beta users.
 
 ### Phase 1: Crowdsourced Verification (Weeks 6–10)
+
 - **Goal**: Enable data collection.
 - Product not found → Capture photo of nutrition label.
 - Google Vision OCR extracts barcode, name, ingredients, and nutrition.
@@ -158,6 +172,7 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 - **Success Metric**: 1,000+ products added and verified by 2+ users.
 
 ### Phase 2: Smart Serving (Weeks 11–14)
+
 - **Goal**: Show verified data confidently.
 - $\ge 3$ verifications $\rightarrow$ Serve as **Verified** (Green Checkmark).
 - $1\text{--}2$ verifications $\rightarrow$ Serve with **"Unverified"** badge.
@@ -167,6 +182,7 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 - **Success Metric**: 80%+ scan success rate.
 
 ### Phase 3: Launch Public (Weeks 15–16)
+
 - **Goal**: Public beta on iOS + TestFlight release.
 - India-specific community marketing (Instagram, fitness/health groups).
 - Monitor data quality and volunteer verification rate.
@@ -178,7 +194,7 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 
 ### High-Level Diagram
 
-```
+```markdown
 ┌─────────────────────────────────────────────────────────────┐
 │                     iOS App (Swift)                         │
 │  ┌──────────────────────────────────────────────────────┐  │
@@ -222,22 +238,22 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant OFF as Open Food Facts
 
-    User->>iOS: Scans Barcode (e.g. 5010062000034)
+    User->>iOS: Scans Barcode
     iOS->>API: GET /api/v1/products/search?barcode=...&country=IN
-    API->>Redis: Check Cache (Key: product:{barcode})
+    API->>Redis: Check Cache
+
     alt Cache Hit
         Redis-->>API: Return Cached Product JSON
-    else Cache Miss
+    else Cache Miss (Found in PostgreSQL)
         API->>DB: Query products table by barcode
-        alt Found in DB
-            DB-->>API: Return Product Record
-            API->>Redis: Set Cache (5-min TTL)
-        else Not in DB
-            API->>OFF: Fetch from Open Food Facts API
-            OFF-->>API: Product Data
-            API->>Redis: Set Cache (5-min TTL)
-        end
+        DB-->>API: Return Product Record
+        API->>Redis: Set Cache (5-min TTL)
+    else Cache Miss (Not in DB, Found in Open Food Facts)
+        API->>OFF: Fetch from Open Food Facts API
+        OFF-->>API: Product Data
+        API->>Redis: Set Cache (5-min TTL)
     end
+
     API-->>iOS: 200 OK (Product Data + Verified Status)
     iOS->>User: Display Product Details (Verified/Unverified Badge)
 ```
@@ -249,25 +265,25 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User1 as Contributor (User 1)
-    participant iOS1 as iOS App (User 1)
+    actor User1 as Contributor
+    participant iOS1 as Contributor App
     participant API as Rust Backend
     participant Vision as Google Vision OCR
     participant DB as PostgreSQL
-    actor User2 as Verifier (User 2)
-    participant iOS2 as iOS App (User 2)
+    actor User2 as Verifier
+    participant iOS2 as Verifier App
 
     User1->>iOS1: Scans Barcode (Not Found)
-    iOS1->>User1: "Product Not Found. Help us add it?"
+    iOS1->>User1: Prompt: "Product Not Found. Help us add it?"
     User1->>iOS1: Captures Label Photo
-    iOS1->>API: POST /api/v1/products/submit_label (Base64 Image + Barcode)
-    API->>Vision: Text Detection & OCR Extraction
-    Vision-->>API: Raw Text & Confidence Score
-    API->>API: Parse Nutrition, Ingredients & Brand
-    API->>DB: Insert ocr_submissions & unverified product
+    iOS1->>API: POST /api/v1/products/submit_label
+    API->>Vision: Text Detection and OCR Extraction
+    Vision-->>API: Raw Text and Confidence Score
+    API->>API: Parse Nutrition, Ingredients, and Brand
+    API->>DB: Insert ocr_submissions and unverified product
     API-->>iOS1: Extracted Nutrition Data
-    iOS1->>User1: "Is this correct?" (Review / Edit)
-    User1->>iOS1: Clicks [Confirm]
+    iOS1->>User1: "Is this correct?" (Review and Edit)
+    User1->>iOS1: Clicks Confirm
     iOS1->>API: POST /api/v1/products/verify (confirmed: true)
     API->>DB: Insert verification record (count = 1)
     
@@ -275,17 +291,17 @@ sequenceDiagram
     User2->>iOS2: Scans Same Barcode
     iOS2->>API: GET /api/v1/products/search
     API-->>iOS2: Unverified Product (verification_count: 1)
-    iOS2->>User2: "1 person added this. Help verify?"
-    User2->>iOS2: Clicks [Verify]
+    iOS2->>User2: Prompt: "1 person added this. Help verify?"
+    User2->>iOS2: Clicks Verify
     iOS2->>API: POST /api/v1/products/verify
-    API->>DB: Increment verification_count (count >= 3 -> verified: true)
+    API->>DB: Increment count (3+ verifications marks verified)
 ```
 
 ---
 
 ## 🗄️ Database Schema
 
-```
+```markdown
 ┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
 │              products                 │       │             verifications             │
 ├───────────────────────────────────────┤       ├───────────────────────────────────────┤
@@ -316,6 +332,7 @@ sequenceDiagram
 ```
 
 ### Table Indices
+
 - **`products`**:
   - `CREATE UNIQUE INDEX idx_products_barcode ON products(barcode);`
   - `CREATE INDEX idx_products_country_barcode ON products(country, barcode);`
@@ -334,12 +351,14 @@ sequenceDiagram
 ## 📡 API Contract
 
 ### 1. Search Product by Barcode
+
 - **Endpoint**: `GET /api/v1/products/search`
 - **Query Parameters**:
   - `barcode`: `string` (required)
   - `country`: `string` (default: `"IN"`)
 
-#### Response (`200 OK` - Found):
+#### Response (`200 OK` - Found)
+
 ```json
 {
   "status": "found",
@@ -363,7 +382,8 @@ sequenceDiagram
 }
 ```
 
-#### Response (`404 Not Found`):
+#### Response (`404 Not Found`)
+
 ```json
 {
   "status": "not_found",
@@ -374,8 +394,10 @@ sequenceDiagram
 ---
 
 ### 2. Submit Label Photo (OCR Extraction)
+
 - **Endpoint**: `POST /api/v1/products/submit_label`
 - **Request Body**:
+
 ```json
 {
   "barcode": "8901030825415",
@@ -385,7 +407,8 @@ sequenceDiagram
 }
 ```
 
-#### Response (`200 OK`):
+#### Response (`200 OK`)
+
 ```json
 {
   "ocr_submission_id": "b18b6250-9d04-4cc4-9c09-a1b9ceec848a",
@@ -406,8 +429,10 @@ sequenceDiagram
 ---
 
 ### 3. Verify Product Data
+
 - **Endpoint**: `POST /api/v1/products/verify`
 - **Request Body**:
+
 ```json
 {
   "barcode": "8901030825415",
@@ -418,7 +443,8 @@ sequenceDiagram
 }
 ```
 
-#### Response (`200 OK`):
+#### Response (`200 OK`)
+
 ```json
 {
   "status": "verified",
@@ -431,7 +457,7 @@ sequenceDiagram
 
 ## 📂 Project Structure
 
-```
+```markdown
 true-lable/
 ├── backend/                        # Rust Backend Service
 │   ├── Cargo.toml
@@ -477,6 +503,7 @@ true-lable/
 ## 📅 SDLC & Sprint Workflow
 
 ### Phase 0: MVP (Weeks 1–5)
+
 - **Sprint 1 (Week 1)**: Rust backend foundation (`axum`, `sqlx`, `redis`), `GET /products/search` draft, basic iOS Vision scanner.
 - **Sprint 2 (Week 2)**: Open Food Facts API integration, Redis 5-min caching layer, end-to-end barcode scan flow.
 - **Sprint 3 (Week 3)**: iOS local scan history persistence (CoreData/SwiftData), structured error handling, and request logging.
@@ -484,6 +511,7 @@ true-lable/
 - **Sprint 5 (Week 5)**: UI polish, 10-user internal beta test, Sentry instrumentation.
 
 ### Phase 1: Crowdsourced Verification (Weeks 6–10)
+
 - **Sprint 6 (Week 6)**: `ocr_submissions` + `verifications` schema, `POST /products/submit_label`, Google Vision OCR integration.
 - **Sprint 7 (Week 7)**: iOS label photo capture, image compression, OCR result preview & edit screen.
 - **Sprint 8 (Week 8)**: `POST /products/verify` endpoint, verification counting logic ($\ge 3$ threshold).
@@ -495,17 +523,17 @@ true-lable/
 ## ⚖️ Architectural Decisions (ADRs)
 
 | Component | Choice | Rationale | Alternatives Considered |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Database** | **PostgreSQL** | Relational integrity, JSONB support for variable nutrition tables, indexed lookup for millions of rows. | *Redis-only* (no persistence), *CockroachDB* (overkill for MVP). |
 | **Cache** | **Redis** | Sub-5ms response time for repeat scans; 5-min TTL absorbs traffic spikes from popular items. | *In-memory LRU* (doesn't scale across replicas). |
 | **OCR Engine** | **Google Vision API** | 95%+ accuracy on curved/glossy food packaging; fast cloud inference; cost negligible (~$1.50/1K requests). | *On-device ML* (large app size, high battery drain, low accuracy on wrinkled labels). |
-| **Backend Framework**| **Rust (Axum + Tokio)** | Memory safety, blazing performance, low resource footprint (runs in 64MB container), strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
+| **Backend Framework** | **Rust (Axum + Tokio)** | Memory safety, blazing performance, low resource footprint (runs in 64MB container), strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
 
 ---
 
 ## 🛡️ Data Quality & Verification Strategy
 
-```
+```markdown
                           ┌───────────────────────────┐
                           │ User submits label photo  │
                           └─────────────┬─────────────┘
@@ -542,7 +570,7 @@ true-lable/
 ### Cost Breakdown (Estimated MVP / Month 1)
 
 | Service | Provider | Purpose | Estimated Monthly Cost |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **API Compute** | Railway / Fly.io / KinD | Rust backend container | \$10 – \$20 |
 | **Database** | Supabase / Railway | Managed PostgreSQL | \$0 – \$10 (Free Tier) |
 | **Cache** | Upstash / Railway | Managed Redis | \$0 – \$5 (Free Tier) |
@@ -575,9 +603,11 @@ true-lable/
   - Nutrition parser test suite with mock OCR outputs.
   - Configuration environment variable loaders (race-free with mutex guards).
   - Error code status mapping (`AppError` $\rightarrow$ HTTP Status Code).
+
   ```bash
   cd backend && cargo test
   ```
+
 - **Integration Tests**:
   - Full HTTP request lifecycle tests using `tower::ServiceExt::oneshot`.
   - Database pool connectivity and health ping validation.
@@ -589,7 +619,7 @@ true-lable/
 ## ⏱️ Timeline Overview
 
 | Period | Phase | Key Deliverable |
-|---|---|---|
+| --- | --- | --- |
 | **Weeks 1–5** | **Phase 0: MVP** | Barcode scan $\rightarrow$ Open Food Facts $\rightarrow$ Local history caching |
 | **Weeks 6–10** | **Phase 1: Crowdsourcing** | Label capture $\rightarrow$ Google Vision OCR $\rightarrow$ Peer verification |
 | **Weeks 11–14** | **Phase 2: Smart Serving** | Confidence scoring, verification threshold engine ($\ge 3$), TestFlight beta |
