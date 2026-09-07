@@ -236,7 +236,7 @@ sequenceDiagram
     participant API as Rust Backend
     participant Redis as Redis Cache
     participant DB as PostgreSQL
-    participant OFF as Open Food Facts
+    participant FoodFacts as Open Food Facts
 
     User->>iOS: Scans Barcode
     iOS->>API: GET /api/v1/products/search?barcode=...&country=IN
@@ -249,8 +249,8 @@ sequenceDiagram
         DB-->>API: Return Product Record
         API->>Redis: Set Cache (5-min TTL)
     else Cache Miss (Not in DB, Found in Open Food Facts)
-        API->>OFF: Fetch from Open Food Facts API
-        OFF-->>API: Product Data
+        API->>FoodFacts: Fetch from Open Food Facts API
+        FoodFacts-->>API: Product Data
         API->>Redis: Set Cache (5-min TTL)
     end
 
