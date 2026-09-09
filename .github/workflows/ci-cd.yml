@@ -1,0 +1,135 @@
+name: CI/CD
+
+# Every push to any of the 4 long-lived branches builds + tests + publishes
+# both images to Docker Hub, and `latest` always moves to whatever branch
+# just published (regardless of which one). Only `main` goes on to deploy.
+on:
+  push:
+    branches: [main, test, dev, sit]
+
+env:
+  BACKEND_IMAGE: tarunvishwakarma/true-lable-backend
+  WEB_IMAGE: tarunvishwakarma/true-lable-web
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Test
+        working-directory: backend
+        run: cargo test --release
+
+      - id: meta
+        run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  web:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          file: web/apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.WEB_IMAGE }}:${{ github.ref_name }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.WEB_IMAGE }}:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  deploy:
+    needs: [backend, web]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required to assume the AWS role below via OIDC
+      contents: read
+    env:
+      AWS_REGION: us-east-1 # must match infra/aws/cluster/variables.tf's `region`
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+
+      # No stored AWS credentials — this exchanges the run's OIDC token for
+      # short-lived ones via the role infra/aws/cluster/github-oidc.tf
+      # creates, trusted only for `main` runs of this exact repo.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubeconfig
+        run: aws eks update-kubeconfig --name true-label --region ${{ env.AWS_REGION }}
+
+      # Real values live only in GitHub secrets — never committed. This
+      # keeps `backend-secrets`/`postgres-secrets` in the cluster in sync
+      # with them on every deploy; kustomization.yaml only references the
+      # names (see k8s/base/*/secret.example.yaml for the template).
+      - name: Sync secrets
+        run: |
+          kubectl create namespace true-label --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic backend-secrets -n true-label \
+            --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
+            --from-literal=REDIS_URL="${{ secrets.PROD_REDIS_URL }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic postgres-secrets -n true-label \
+            --from-literal=POSTGRES_USER="${{ secrets.PROD_POSTGRES_USER }}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.PROD_POSTGRES_PASSWORD }}" \
+            --from-literal=POSTGRES_DB="${{ secrets.PROD_POSTGRES_DB }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Pin image tags to this build
+        working-directory: k8s/overlays/main
+        run: |
+          yq -i '(.images[] | select(.name == "${{ env.BACKEND_IMAGE }}") | .newTag) = "${{ needs.backend.outputs.sha_tag }}"' kustomization.yaml
+          yq -i '(.images[] | select(.name == "${{ env.WEB_IMAGE }}") | .newTag) = "${{ needs.web.outputs.sha_tag }}"' kustomization.yaml
+
+      - name: Deploy
+        run: kubectl apply -k k8s/overlays/main
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend -n true-label --timeout=180s
+          kubectl rollout status deployment/web -n true-label --timeout=180s

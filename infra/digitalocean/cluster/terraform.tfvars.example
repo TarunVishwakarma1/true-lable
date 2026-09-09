@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+do_token = "dop_v1_..."

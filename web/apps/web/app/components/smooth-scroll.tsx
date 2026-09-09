@@ -5,14 +5,16 @@ import Lenis from "lenis";
 
 declare global {
   interface Window {
-    lenis?: Lenis;
+    // Named appLenis, not lenis — the `lenis` package itself already
+    // declares a differently-shaped `window.lenis` for its own devtools.
+    appLenis?: Lenis;
   }
 }
 
 export function SmoothScroll() {
   useEffect(() => {
     const lenis = new Lenis();
-    window.lenis = lenis;
+    window.appLenis = lenis;
 
     function raf(time: number) {
       lenis.raf(time);
@@ -23,7 +25,7 @@ export function SmoothScroll() {
     return () => {
       cancelAnimationFrame(frame);
       lenis.destroy();
-      delete window.lenis;
+      delete window.appLenis;
     };
   }, []);
 

@@ -1,0 +1,39 @@
+# Not applied by default (see kustomization.yaml) — backend/web are already
+# reachable via their own LoadBalancer Services without any of this. Add
+# this to kustomization.yaml's `resources:` once you have a real domain and
+# an ingress controller (e.g. ingress-nginx) installed in the cluster, and
+# replace the two placeholder hosts below.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: true-label
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.example.com
+        - app.example.com
+      secretName: true-label-tls
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 80
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

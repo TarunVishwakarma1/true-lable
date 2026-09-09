@@ -1,0 +1,13 @@
+# No storageClassName set — uses the cluster's default provisioner.
+# Override per overlay if a cloud needs an explicit class, e.g.:
+#   AWS (EKS): gp3        Azure (AKS): managed-csi     DigitalOcean (DOKS): do-block-storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

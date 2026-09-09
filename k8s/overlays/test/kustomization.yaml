@@ -1,0 +1,56 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: true-label-test
+
+resources:
+  - ../../base
+
+images:
+  - name: tarunvishwakarma/true-lable-backend
+    newTag: test
+  - name: tarunvishwakarma/true-lable-web
+    newTag: test
+
+patches:
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: Deployment
+      name: web
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: web
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  - target:
+      kind: ConfigMap
+      name: backend-config
+    patch: |
+      - op: replace
+        path: /data/APP_ENV
+        value: test

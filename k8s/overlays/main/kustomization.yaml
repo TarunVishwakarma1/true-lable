@@ -1,0 +1,26 @@
+# The only overlay CI actually deploys (see .github/workflows/deploy.yml,
+# which runs only on pushes to `main`). It re-pins both image tags to the
+# exact commit SHA just built via `kustomize edit set image` before
+# `kubectl apply -k` — the `latest` below is just the local/manual fallback.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: true-label
+
+resources:
+  - ../../base
+
+images:
+  - name: tarunvishwakarma/true-lable-backend
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-web
+    newTag: latest
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: backend-config
+    patch: |
+      - op: replace
+        path: /data/APP_ENV
+        value: production

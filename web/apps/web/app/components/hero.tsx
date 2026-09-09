@@ -19,11 +19,11 @@ export function Hero() {
       el.style.transform = `translateY(${progress * 80}px)`;
     }
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.lenis?.on("scroll", onScroll);
+    window.appLenis?.on("scroll", onScroll);
     onScroll();
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.lenis?.off("scroll", onScroll);
+      window.appLenis?.off("scroll", onScroll);
     };
   }, []);
 

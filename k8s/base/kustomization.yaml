@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - backend/hpa.yaml
+  - backend/configmap.yaml
+  - web/deployment.yaml
+  - web/service.yaml
+  - web/hpa.yaml
+  - postgres/deployment.yaml
+  - postgres/service.yaml
+  - postgres/pvc.yaml
+  - redis/deployment.yaml
+  - redis/service.yaml
+  # ingress.yaml intentionally excluded — see that file's header comment.
+
+images:
+  - name: tarunvishwakarma/true-lable-backend
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-web
+    newTag: latest
