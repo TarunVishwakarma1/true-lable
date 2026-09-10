@@ -50,7 +50,7 @@ export function NewsletterForm() {
         {state.status === "sending" ? "Sending…" : "Subscribe →"}
       </button>
       {state.status === "error" && (
-        <p role="alert" className="basis-full pb-2 text-sm text-amber-600 dark:text-amber-400">
+        <p role="alert" className="basis-full pb-2 text-sm text-warn">
           {state.message}
         </p>
       )}

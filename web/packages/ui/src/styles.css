@@ -1,12 +1,15 @@
 /* TrueLabel design tokens. Import after `@import "tailwindcss"` in the app's global stylesheet,
    and add `@source` pointing at packages/ui/src so Tailwind picks up the classes used here. */
 
+/* Light is "daylight": warm paper, not clinical white. */
 :root {
-  --bg: #f6f6f4;
-  --fg: #111111;
-  --muted: #6a6a6a;
-  --line: rgba(0, 0, 0, 0.12);
-  --surface: #ffffff;
+  --bg: #f3f0e8;
+  --fg: #171612;
+  --muted: #6f6a5f;
+  --line: rgba(23, 22, 18, 0.14);
+  --surface: #faf8f2;
+  --accent: #10b981;
+  --warn: #f59e0b;
   color-scheme: light;
 }
 .dark {
@@ -18,13 +21,20 @@
   color-scheme: dark;
 }
 
+/* Accent presets, selected with data-accent on <html>. Keep in sync with theme.tsx. */
+[data-accent="saffron"] { --accent: #f59e0b; --warn: #fb7185; }
+[data-accent="sky"] { --accent: #38bdf8; --warn: #f59e0b; }
+[data-accent="rose"] { --accent: #fb7185; --warn: #f59e0b; }
+[data-accent="lime"] { --accent: #a3e635; --warn: #f59e0b; }
+
 @theme inline {
   --color-bg: var(--bg);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-surface: var(--surface);
-  --color-accent: #10b981;
+  --color-accent: var(--accent);
+  --color-warn: var(--warn);
   --color-ink: #0a0a0a;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -46,6 +56,10 @@
 }
 @keyframes blink {
   to { opacity: 0; }
+}
+@keyframes sound-bar {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
 }
 
 ::selection {

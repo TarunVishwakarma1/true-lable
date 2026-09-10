@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import { useRef, useState } from "react";
 import { Container } from "@repo/ui/container";
+import { Numeral } from "@repo/ui/parallax";
 import { ScanDemo, type Phase } from "@repo/ui/scan-demo";
 
 const BEATS: { phase: Phase; n: string; title: string; body: string; note?: string }[] = [
@@ -10,14 +11,14 @@ const BEATS: { phase: Phase; n: string; title: string; body: string; note?: stri
     phase: "scan",
     n: "01",
     title: "Scan.",
-    body: "Point the camera at the barcode. If we've seen the product, the facts are on screen in under a second. If not, you're the first: adding it is a photo of the label and a minute of your time.",
+    body: "Point the camera at the barcode. If we've seen the packet, the facts are on screen before you've put it back. If not, you're first: a photo of the label and a minute of your time, and the next person in that aisle gets the answer.",
   },
   {
     phase: "verify",
     n: "02",
     title: "Verify.",
-    body: "Every product page shows the photo of the real label beside the typed numbers. Anyone can tap “matches” or “doesn't”. Enough agreement marks it verified; one dispute sends it back to review.",
-    note: "A stranger in another city checked this label before you. That is what makes it trustworthy.",
+    body: "Every product page puts the photo of the real label beside the typed numbers. Anyone can tap “matches” or “doesn't”. Enough agreement marks it verified. One dispute sends it back to review.",
+    note: "A stranger in another city checked this label before you. That is the whole trust model, and it's the only one that scales to every shelf in the country.",
   },
   {
     phase: "know",
@@ -40,7 +41,14 @@ export function Journey() {
 
   return (
     <section id="journey" ref={ref} className="relative h-[360vh] scroll-mt-0">
-      <div className="sticky top-0 h-svh overflow-hidden">
+      <motion.div
+        initial={{ clipPath: "inset(12% 4% 12% 4% round 2rem)" }}
+        whileInView={{ clipPath: "inset(0% 0% 0% 0% round 0rem)" }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 1.2, ease: EASE }}
+        className="sticky top-0 h-svh overflow-hidden bg-surface"
+      >
+        <Numeral n={beat.n} className="left-[-2vw] bottom-[-12vh]" />
         <Container className="flex h-full flex-col pt-24 pb-8">
           <div className="flex items-baseline justify-between border-t border-line pt-5 font-mono text-xs text-muted">
             <p>
@@ -64,7 +72,7 @@ export function Journey() {
                 >
                   <h3 className="text-4xl font-medium tracking-[-0.04em] sm:text-6xl lg:text-8xl">{beat.title}</h3>
                   <p className="mt-4 max-w-lg text-base leading-relaxed text-pretty text-muted sm:mt-6 sm:text-lg">{beat.body}</p>
-                  {beat.note && <p className="mt-5 hidden max-w-lg font-mono sm:block text-[11px] leading-relaxed text-muted">{beat.note}</p>}
+                  {beat.note && <p className="mt-5 hidden max-w-lg font-mono text-[11px] leading-relaxed text-muted sm:block">{beat.note}</p>}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -77,7 +85,7 @@ export function Journey() {
             <motion.div style={{ width: bar }} className="absolute inset-y-0 left-0 bg-accent" />
           </div>
         </Container>
-      </div>
+      </motion.div>
     </section>
   );
 }

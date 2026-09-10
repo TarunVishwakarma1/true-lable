@@ -6,6 +6,7 @@ import { Providers } from "@repo/ui/providers";
 import { SmoothScroll } from "@repo/ui/smooth-scroll";
 import { Preloader } from "@repo/ui/preloader";
 import { ScrollProgress } from "@repo/ui/scroll-progress";
+import { ACCENT_BOOT_SCRIPT } from "@repo/ui/theme-boot";
 import { SITE_URL } from "./lib/site";
 import "lenis/dist/lenis.css";
 import "./globals.css";
@@ -59,7 +60,7 @@ export default function RootLayout({
           // markup above (dark-mode-first default) and this corrects it.
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark')}}catch(e){}",
+              "try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark')}}catch(e){}" + ACCENT_BOOT_SCRIPT,
           }}
         />
       </head>

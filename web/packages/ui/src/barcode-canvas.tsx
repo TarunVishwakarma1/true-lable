@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useAccent } from "./theme";
 import { useIsDark } from "./use-media";
 
 const SEED = "STARTKNOWINGWHATYOUEAT·TRUELABEL·FREE·OPENSOURCE·INDIA·SCANVERIFYKNOW·COMMUNITY";
@@ -9,6 +10,11 @@ const SEED = "STARTKNOWINGWHATYOUEAT·TRUELABEL·FREE·OPENSOURCE·INDIA·SCANVE
 export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h-44 lg:h-56" }: { seed?: string; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const dark = useIsDark();
+  const { accent } = useAccent();
+  const rgb = useMemo(() => {
+    const n = parseInt(accent.slice(1), 16);
+    return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+  }, [accent]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -56,7 +62,7 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
         ctx!.fillStyle = `rgba(${fg()},${1 - m})`;
         ctx!.fillRect(x, h - bh, bw, bh);
         if (m > 0.01) {
-          ctx!.fillStyle = `rgba(16,185,129,${m})`;
+          ctx!.fillStyle = `rgba(${rgb},${m})`;
           ctx!.fillRect(x, h - bh, bw, bh);
         }
         x += bw + gap;
@@ -84,7 +90,7 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
       canvas.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mouseleave", onLeave);
     };
-  }, [dark, seed]);
+  }, [dark, seed, rgb]);
 
   return <canvas ref={ref} aria-hidden data-cursor="scan" className={className} />;
 }

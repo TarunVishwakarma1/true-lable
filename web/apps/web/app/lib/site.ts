@@ -6,7 +6,7 @@ export const NAV = [
   { label: "The problem", href: "#problem" },
   { label: "How it works", href: "#journey" },
   { label: "Free & Premium", href: "#features" },
-  { label: "Community", href: "#community" },
+  { label: "Built in the open", href: "#community" },
 ];
 
 export const SHELF = [
@@ -24,4 +24,6 @@ export const SHELF = [
   "Cream biscuits",
   "Paneer tikka masala mix",
   "Chai premix",
+  "Nimbu pani",
+  "Khakhra",
 ];

@@ -1,0 +1,8 @@
+Sounds in this folder are from Kenney's "Interface Sounds" and "UI Audio" packs (https://kenney.nl),
+released under Creative Commons Zero (CC0 1.0). No attribution required; given anyway.
+
+scan.ogg   = Interface Sounds / confirmation_002.ogg
+verify.ogg = Interface Sounds / confirmation_001.ogg
+tick.ogg   = Interface Sounds / tick_002.ogg
+beat.ogg   = Interface Sounds / pluck_001.ogg
+open.ogg   = UI Audio / switch1.ogg

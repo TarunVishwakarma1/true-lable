@@ -1,6 +1,7 @@
 import { REPO_URL } from "../lib/site";
 import { Button, TextLink } from "@repo/ui/button";
 import { Container } from "@repo/ui/container";
+import { Parallax } from "@repo/ui/parallax";
 import { BarcodeCanvas } from "@repo/ui/barcode-canvas";
 import { Reveal } from "@repo/ui/reveal";
 
@@ -9,9 +10,9 @@ export function FinalCta() {
     <section className="border-t border-line py-24 md:py-40">
       <Container>
         <Reveal className="grid gap-12 lg:grid-cols-12 lg:gap-8">
-          <h2 className="text-[clamp(3rem,9vw,8.5rem)] leading-[0.92] font-medium tracking-[-0.045em] text-balance lg:col-span-8">
-            Start knowing what you eat.
-          </h2>
+          <Parallax speed={0.2} className="lg:col-span-8">
+            <h2 className="text-[clamp(3rem,9vw,8.5rem)] leading-[0.92] font-medium tracking-[-0.045em] text-balance">Start knowing what you eat.</h2>
+          </Parallax>
           <div className="flex flex-col justify-end lg:col-span-4">
             <p className="max-w-sm text-lg leading-relaxed text-pretty text-muted">
               The iOS app is in early access on GitHub. Star the repo to follow the first release, or open an

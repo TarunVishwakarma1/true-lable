@@ -3,6 +3,8 @@
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useRef, useState } from "react";
 import { Container } from "@repo/ui/container";
+import { SoundToggle } from "@repo/ui/sound";
+import { AccentPicker } from "@repo/ui/theme";
 import { ThemeToggle } from "@repo/ui/theme-toggle";
 import { NAV, REPO_URL } from "../lib/site";
 
@@ -62,6 +64,8 @@ export function Nav() {
                 <path d="M7 17 17 7M9 7h8v8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </a>
+            <SoundToggle className="hidden lg:flex" />
+            <AccentPicker />
             <ThemeToggle />
             <button
               type="button"
