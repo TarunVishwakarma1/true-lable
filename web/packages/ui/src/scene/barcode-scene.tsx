@@ -7,6 +7,7 @@ import { BlendFunction } from "postprocessing";
 import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { usePointer } from "../use-pointer";
+import { Resume } from "./resume";
 import * as THREE from "three";
 
 const SEED =
@@ -260,6 +261,7 @@ export default function BarcodeScene({
       <ambientLight intensity={dark ? 0.35 : 0.9} />
       <directionalLight position={[4, 8, 6]} intensity={dark ? 3 : 2.4} />
       <directionalLight position={[-6, 3, -2]} intensity={dark ? 0.6 : 0.8} color="#bfe8d6" />
+      <Resume active={active} />
       <Bars progress={progress} hold={hold} dark={dark} reduced={reduced} accent={accent} eventSource={eventSource} />
       <Floor dark={dark} quality={quality} />
       {quality === "high" && (

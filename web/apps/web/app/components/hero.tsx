@@ -70,10 +70,10 @@ export function Hero() {
   }, []);
 
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  useMotionValueEvent(scrollYProgress, "change", (v) => {
-    setActive(v < 1);
-    setBeat(v < 0.42 ? 0 : v < 0.72 ? 1 : 2);
-  });
+  useMotionValueEvent(scrollYProgress, "change", (v) => setBeat(v < 0.42 ? 0 : v < 0.72 ? 1 : 2));
+  // The sticky range ends before the stage leaves the screen; keep rendering until it has.
+  const { scrollYProgress: onScreen } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  useMotionValueEvent(onScreen, "change", (v) => setActive(v < 1));
 
   const introOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
   const introY = useTransform(scrollYProgress, [0, 0.3], [0, -40]);

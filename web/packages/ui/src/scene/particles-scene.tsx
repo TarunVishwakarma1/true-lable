@@ -5,6 +5,7 @@ import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { usePointer } from "../use-pointer";
+import { Resume } from "./resume";
 
 const COUNT = 14000;
 const SEED = "TRUELABEL·KNOWWHATYOUEAT·INDIA·SCANVERIFYKNOW";
@@ -189,7 +190,6 @@ function Field({
   );
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") (window as unknown as { __particles?: THREE.ShaderMaterial }).__particles = material;
     material.uniforms.uAccent!.value.set(accent);
     material.uniforms.uBase!.value.set(dark ? "#8a8a86" : "#5a5750");
     material.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
@@ -241,6 +241,7 @@ export default function ParticlesScene({
       camera={{ position: [0, 0, 7], fov: 40, near: 0.1, far: 40 }}
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
+      <Resume active={active} />
       <Field morph={morph} accent={accent} dark={dark} eventSource={eventSource} />
     </Canvas>
   );
