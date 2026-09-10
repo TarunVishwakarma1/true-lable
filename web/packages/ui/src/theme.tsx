@@ -52,11 +52,14 @@ export function AccentPicker({ className = "" }: { className?: string }) {
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
     window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", close);
+    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", close);
+      window.removeEventListener("keydown", onKey);
     };
   }, [open]);
 

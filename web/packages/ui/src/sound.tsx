@@ -15,11 +15,17 @@ const FILES: Record<Cue, string> = {
 };
 const GAIN: Record<Cue, number> = { scan: 0.35, tick: 0.12, verify: 0.35, open: 0.25, beat: 0.2 };
 
+const KEY = "truelabel:sound";
+// Restored here so a saved preference survives a reload, not just a re-render.
 let enabled = false;
+if (typeof window !== "undefined") {
+  try {
+    enabled = localStorage.getItem(KEY) === "1";
+  } catch {}
+}
 let ctx: AudioContext | null = null;
 const buffers = new Map<Cue, AudioBuffer>();
 const listeners = new Set<() => void>();
-const KEY = "truelabel:sound";
 let lastTick = 0;
 
 function emit() {
