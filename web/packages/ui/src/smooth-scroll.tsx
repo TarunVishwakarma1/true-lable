@@ -13,17 +13,9 @@ declare global {
 
 export function SmoothScroll() {
   useEffect(() => {
-    const lenis = new Lenis();
+    const lenis = new Lenis({ autoRaf: true, lerp: 0.09, anchors: { offset: -72 } });
     window.appLenis = lenis;
-
-    function raf(time: number) {
-      lenis.raf(time);
-      frame = requestAnimationFrame(raf);
-    }
-    let frame = requestAnimationFrame(raf);
-
     return () => {
-      cancelAnimationFrame(frame);
       lenis.destroy();
       delete window.appLenis;
     };

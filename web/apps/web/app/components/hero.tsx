@@ -1,109 +1,139 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Reveal } from "./reveal";
-import { Magnetic } from "./magnetic";
-import { HeroVisual } from "./hero-visual";
-import { TextScramble } from "./text-scramble";
+import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from "motion/react";
+import dynamic from "next/dynamic";
+import { useRef, useState } from "react";
+import { REPO_URL } from "../lib/site";
+import { Button, TextLink } from "@repo/ui/button";
+import { Container } from "@repo/ui/container";
+import { useIsDark } from "@repo/ui/use-media";
+
+const BarcodeScene = dynamic(() => import("@repo/ui/scene/barcode-scene"), { ssr: false });
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+// The preloader lifts at ~1.6s; the hero starts after it.
+const T0 = 1.7;
+
+const READINGS = [
+  { ean: "890 4213 08 7654", name: "Instant noodles, masala", read: "1,020 mg sodium. About half your day." },
+  { ean: "890 2290 45 0117", name: "Mango fruit drink", read: "26 g sugar in one pack. About six teaspoons." },
+];
+
+function Words({ text, delay, className = "" }: { text: string; delay: number; className?: string }) {
+  return (
+    <>
+      {text.split(" ").map((word, i) => (
+        <span key={i} className="-mb-[0.14em] mr-[0.22em] inline-block overflow-hidden pb-[0.14em] align-bottom last:mr-0">
+          <motion.span
+            className={`inline-block ${className}`}
+            initial={{ y: "110%" }}
+            animate={{ y: 0 }}
+            transition={{ duration: 1.1, delay: delay + i * 0.07, ease: EASE }}
+          >
+            {word}
+          </motion.span>
+        </span>
+      ))}
+    </>
+  );
+}
+
+const fade = (delay: number) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.9, delay, ease: EASE },
+});
 
 export function Hero() {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
+  const dark = useIsDark();
+  const reduced = useReducedMotion() ?? false;
+  const [active, setActive] = useState(true);
+  const [beat, setBeat] = useState(0);
 
-  useEffect(() => {
-    function onScroll() {
-      const el = contentRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const progress = Math.min(Math.max(-rect.top / rect.height, 0), 1);
-      el.style.opacity = String(1 - progress * 0.85);
-      el.style.transform = `translateY(${progress * 80}px)`;
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.appLenis?.on("scroll", onScroll);
-    onScroll();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.appLenis?.off("scroll", onScroll);
-    };
-  }, []);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  useMotionValueEvent(scrollYProgress, "change", (v) => {
+    setActive(v < 1);
+    setBeat(v < 0.42 ? 0 : v < 0.72 ? 1 : 2);
+  });
+
+  const introOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
+  const introY = useTransform(scrollYProgress, [0, 0.3], [0, -40]);
+  const scanLine = useTransform(scrollYProgress, [0.08, 0.88], ["0%", "100%"]);
+  const hintOpacity = useTransform(scrollYProgress, [0, 0.08], [1, 0]);
+
+  const reading = READINGS[beat === 2 ? 1 : 0]!;
 
   return (
-    <section className="relative flex min-h-screen items-center overflow-hidden px-6 pt-24 pb-16">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20 bg-[linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)]"
-      />
-      <div
-        className="pointer-events-none absolute -top-32 -left-32 -z-10 h-[32rem] w-[32rem] rounded-full bg-emerald-500/25 blur-[100px]"
-        style={{ animation: "drift 14s ease-in-out infinite" }}
-      />
-      <div
-        className="pointer-events-none absolute -right-32 -bottom-32 -z-10 h-[32rem] w-[32rem] rounded-full bg-teal-400/20 blur-[100px]"
-        style={{ animation: "drift 18s ease-in-out infinite 2s" }}
-      />
-
-      <div
-        ref={contentRef}
-        style={{ transition: "opacity 100ms linear" }}
-        className="mx-auto grid w-full max-w-6xl items-center gap-12 lg:grid-cols-2"
-      >
-        <div className="text-center lg:text-left">
-          <Reveal>
-            <span className="inline-block rounded-full border border-neutral-300 px-3 py-1 text-xs font-medium tracking-wide text-neutral-500 uppercase dark:border-neutral-700 dark:text-neutral-400">
-              Open-Source &middot; Community-Verified
-            </span>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <h1 className="mt-6 text-6xl font-bold tracking-tighter sm:text-7xl lg:text-8xl">
-              <TextScramble text="Scan. Verify." delay={0.3} />{" "}
-              <TextScramble
-                text="Know."
-                delay={0.5}
-                className="text-emerald-500 dark:text-emerald-400"
-              />
-            </h1>
-          </Reveal>
-
-          <Reveal delay={0.25}>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-neutral-600 sm:text-xl lg:mx-0 dark:text-neutral-400">
-              Open-source nutrition data for every product you buy.
-              Community-verified, India-first, completely free.
-            </p>
-          </Reveal>
-
-          <Reveal delay={0.4}>
-            <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
-              <Magnetic className="inline-block">
-                <a
-                  href="#scan"
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-500 px-8 py-3 font-medium text-white shadow-lg shadow-emerald-500/25 transition-shadow duration-200 ease-out hover:shadow-emerald-500/40"
-                >
-                  Scan Your First Product
-                </a>
-              </Magnetic>
-              <a
-                href="#how-it-works"
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-neutral-300 px-8 py-3 font-medium transition-colors duration-150 ease-out hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:border-neutral-500 dark:hover:bg-neutral-900"
-              >
-                See How It Works
-              </a>
-            </div>
-          </Reveal>
+    <section ref={ref} id="top" className="relative h-[260vh]">
+      <div className="sticky top-0 h-svh overflow-hidden">
+        <div className="absolute inset-0" aria-hidden>
+          <BarcodeScene progress={scrollYProgress} dark={dark} reduced={reduced} active={active} />
         </div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-bg to-transparent"
+        />
 
-        <HeroVisual />
+        <Container className="relative flex h-full flex-col justify-between pt-24 pb-6 md:pb-8">
+          <motion.div style={{ opacity: introOpacity, y: introY }} className="pointer-events-none">
+            <h1 className="text-[clamp(3.25rem,10vw,9.5rem)] leading-[0.9] font-medium tracking-[-0.045em]">
+              <Words text="Know what" delay={T0} />
+              <br />
+              <Words text="you eat." delay={T0 + 0.15} className="text-accent" />
+            </h1>
+            <motion.p
+              {...fade(T0 + 0.6)}
+              className="mt-6 max-w-md text-lg leading-relaxed text-pretty text-muted md:mt-8"
+            >
+              A free, open-source scanner that reads the nutrition label back to you in plain language.
+              Built for the packets actually on Indian shelves.
+            </motion.p>
+            <motion.div {...fade(T0 + 0.75)} className="pointer-events-auto mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+              <Button href={REPO_URL} target="_blank" rel="noreferrer" data-cursor="scan">
+                Get early access
+              </Button>
+              <TextLink href="#journey">How it works</TextLink>
+            </motion.div>
+          </motion.div>
+
+          <div className="pointer-events-none">
+            <AnimatePresence mode="wait">
+              {beat > 0 && (
+                <motion.div
+                  key={reading.ean}
+                  initial={{ opacity: 0, y: 24, filter: "blur(6px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -16, filter: "blur(6px)" }}
+                  transition={{ duration: 0.8, ease: EASE }}
+                  className="mb-8 max-w-4xl"
+                >
+                  <p className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+                    <span className="text-accent">Found</span>
+                    <span className="mx-2">·</span>
+                    {reading.ean}
+                  </p>
+                  <p className="mt-3 text-3xl font-medium tracking-[-0.03em] text-balance sm:text-5xl lg:text-6xl">
+                    {reading.name}.{" "}
+                    <span className="text-muted">{reading.read}</span>
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <motion.div {...fade(T0 + 1.2)} className="border-t border-line pt-4">
+              <div className="flex items-center justify-between font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+                <motion.span style={{ opacity: hintOpacity }}>Scroll to scan</motion.span>
+                <span className="hidden sm:inline">Free · Open source · India-first</span>
+                <span className="tabular-nums">0{beat + 1} / 03</span>
+              </div>
+              <div className="relative mt-3 h-px w-full bg-line">
+                <motion.div style={{ width: scanLine }} className="absolute inset-y-0 left-0 bg-accent" />
+              </div>
+            </motion.div>
+          </div>
+        </Container>
       </div>
-
-      <a
-        href="#why-it-matters"
-        aria-label="Scroll to next section"
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-neutral-400 dark:text-neutral-600"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </a>
     </section>
   );
 }
