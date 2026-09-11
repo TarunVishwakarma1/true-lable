@@ -130,59 +130,88 @@ export function setSound(next: boolean) {
   emit();
 }
 
-type Drone = { osc: OscillatorNode; filter: BiquadFilterNode; gain: GainNode };
+type Drone = { osc: OscillatorNode; sub: OscillatorNode; filter: BiquadFilterNode; gain: GainNode };
 let sweepDrone: Drone | null = null;
 let holdDrone: Drone | null = null;
 
-// One persistent oscillator per drone, reused for the whole session — a fast swipe
-// or a long hold only ever ramps its gain/pitch, never spawns a node.
-function drone(ac: AudioContext, type: OscillatorType, freq: number, q: number) {
+// One persistent pair of oscillators per drone, reused for the whole session — a fast
+// swipe or a long hold only ever ramps gain/pitch, never spawns a node. Two sine voices
+// an octave apart (one gently detuned) through a lowpass, plus a slow LFO wobbling the
+// cutoff, is the standard recipe for a warm sci-fi hover hum rather than a thin whistle
+// or a harsh buzz — see https://www.asoundeffect.com/sci-fi-ui-sound-effects/.
+function drone(ac: AudioContext, freq: number, cutoff: number) {
   const osc = ac.createOscillator();
-  osc.type = type;
+  osc.type = "sine";
   osc.frequency.value = freq;
+
+  const sub = ac.createOscillator();
+  sub.type = "sine";
+  sub.frequency.value = freq / 2;
+  sub.detune.value = 5;
+  const subMix = ac.createGain();
+  subMix.gain.value = 0.5;
+
   const filter = ac.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.value = freq * 4;
-  filter.Q.value = q;
+  filter.frequency.value = cutoff;
+  filter.Q.value = 0.4;
+
+  const lfo = ac.createOscillator();
+  lfo.frequency.value = 4.5;
+  const lfoGain = ac.createGain();
+  lfoGain.gain.value = cutoff * 0.12;
+  lfo.connect(lfoGain).connect(filter.frequency);
+
   const gain = ac.createGain();
   gain.gain.value = 0;
-  osc.connect(filter).connect(gain).connect(ac.destination);
+
+  osc.connect(filter);
+  sub.connect(subMix).connect(filter);
+  filter.connect(gain).connect(ac.destination);
   osc.start();
-  return { osc, filter, gain };
+  sub.start();
+  lfo.start();
+  return { osc, sub, filter, gain };
 }
 
-// A bassy "voooommmm" while the cursor sweeps across bars. `intensity` (0..1) is
-// proximity to the nearest bar — it drives gain and pitch, so the sound swells in
-// and out on its own as the cursor nears or leaves, no on/off click at a threshold.
+// A soft, futuristic "vrooom" as the cursor actually sweeps across bars. `intensity`
+// (0..1) is driven by cursor SPEED, not mere proximity — it's zero the instant the
+// cursor stops, so hovering or holding still never leaves it droning.
 export function sweepTone(active: boolean, intensity = 1) {
   if (typeof window === "undefined") return;
   if (!enabled || !active) {
-    sweepDrone?.gain.gain.setTargetAtTime(0, sweepDrone.gain.context.currentTime, 0.08);
+    sweepDrone?.gain.gain.setTargetAtTime(0, sweepDrone.gain.context.currentTime, 0.12);
     return;
   }
   const ac = context();
-  if (!sweepDrone) sweepDrone = drone(ac, "sawtooth", 55, 0.8);
+  if (!sweepDrone) sweepDrone = drone(ac, 70, 380);
   const now = ac.currentTime;
   const k = Math.max(0, Math.min(1, intensity));
-  sweepDrone.gain.gain.setTargetAtTime(k * 0.09, now, 0.06);
-  sweepDrone.osc.frequency.setTargetAtTime(48 + k * 40, now, 0.08);
-  sweepDrone.filter.frequency.setTargetAtTime(200 + k * 500, now, 0.08);
+  const f = 64 + k * 26;
+  sweepDrone.gain.gain.setTargetAtTime(k * 0.06, now, 0.1);
+  sweepDrone.osc.frequency.setTargetAtTime(f, now, 0.12);
+  sweepDrone.sub.frequency.setTargetAtTime(f / 2, now, 0.12);
+  sweepDrone.filter.frequency.setTargetAtTime(320 + k * 260, now, 0.12);
 }
 
-// A deeper "hoooommmm" that builds while the cursor is pressed and held.
-// `progress` (0..1) is how far into the hold/press gesture it is.
+// A deeper, soothing "hmmmmm" that builds while the cursor is pressed and held.
+// `progress` (0..1) is how far into the hold/press gesture it is — gain scales purely
+// off it (no baseline floor), so it's genuinely silent at progress 0 and on release.
 export function holdTone(active: boolean, progress = 0) {
   if (typeof window === "undefined") return;
   if (!enabled || !active) {
-    holdDrone?.gain.gain.setTargetAtTime(0, holdDrone.gain.context.currentTime, 0.1);
+    holdDrone?.gain.gain.setTargetAtTime(0, holdDrone.gain.context.currentTime, 0.15);
     return;
   }
   const ac = context();
-  if (!holdDrone) holdDrone = drone(ac, "triangle", 44, 1.4);
+  if (!holdDrone) holdDrone = drone(ac, 52, 260);
   const now = ac.currentTime;
   const k = Math.max(0, Math.min(1, progress));
-  holdDrone.gain.gain.setTargetAtTime(0.05 + k * 0.09, now, 0.12);
-  holdDrone.osc.frequency.setTargetAtTime(40 + k * 34, now, 0.18);
+  const f = 48 + k * 18;
+  holdDrone.gain.gain.setTargetAtTime(k * 0.07, now, 0.18);
+  holdDrone.osc.frequency.setTargetAtTime(f, now, 0.2);
+  holdDrone.sub.frequency.setTargetAtTime(f / 2, now, 0.2);
+  holdDrone.filter.frequency.setTargetAtTime(220 + k * 200, now, 0.2);
 }
 
 function subscribe(l: () => void) {

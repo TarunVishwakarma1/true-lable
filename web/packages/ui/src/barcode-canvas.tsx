@@ -33,6 +33,9 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     let raf = 0;
     let held = false;
     let heldAt = 0;
+    let prevX = 0;
+    let prevT = 0;
+    let prevInside = false;
 
     const fg = () => (dark ? "230,230,227" : "20,20,20");
 
@@ -73,10 +76,16 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
         }
         x += bw + gap;
       }
-      // A bassy "voom" that swells as the cursor nears a bar, and a deeper "hum" that
-      // builds while pressed — both drive one persistent oscillator each (./sound.tsx),
-      // so sweeping or holding never spawns nodes.
-      sweepTone(mouse.inside, Math.max(0, 1 - nearDist / 1.2));
+      // A soft "vroom" while the cursor is actually sweeping (speed-driven, so a still
+      // cursor goes quiet even mid-hover), and a deeper "hum" that builds while pressed
+      // — both drive one persistent drone each (./sound.tsx), so sweeping/holding never
+      // spawns nodes.
+      const speed = mouse.inside && prevInside ? (Math.abs(mouse.x - prevX) / Math.max(t - prevT, 1)) * 1000 : 0;
+      prevX = mouse.x;
+      prevT = t;
+      prevInside = mouse.inside;
+      const nearness = Math.max(0, 1 - nearDist / 1.4);
+      sweepTone(mouse.inside, Math.min(1, speed / (w * 1.5)) * nearness);
       holdTone(held, held ? Math.min(1, (t - heldAt) / 900) : 0);
       raf = requestAnimationFrame(frame);
     }

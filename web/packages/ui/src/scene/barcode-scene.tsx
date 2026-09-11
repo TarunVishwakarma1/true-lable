@@ -81,6 +81,7 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
       base: new THREE.Color(),
       hit: new THREE.Vector3(),
       mouseX: 0,
+      prevMouseX: 0,
       camPos: new THREE.Vector3(0, 1.7, 9.2),
       look: new THREE.Vector3(0, 0.8, 0),
       seeds,
@@ -105,6 +106,10 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     if (ndc.current.inside && raycaster.ray.intersectPlane(PLANE, state.hit)) {
       state.mouseX += (state.hit.x - state.mouseX) * k;
     }
+    // How fast the cursor is actually sweeping — driving the "vroom" off this (rather
+    // than plain proximity) means it's silent the instant the cursor stops, even mid-hover.
+    const speed = Math.abs(state.mouseX - state.prevMouseX) / Math.max(dt, 1 / 240);
+    state.prevMouseX = state.mouseX;
 
     // Scroll drives the camera and the scan front along the wall. Portrait screens
     // see a narrower slice, so back the camera off and aim lower.
@@ -163,10 +168,12 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
       state.lastFrontIdx = frontIdx;
       play("tick");
     }
-    // A bassy "voom" that swells as the cursor nears a bar, and a deeper "hum" that
-    // builds with the existing hold-to-scan progress — both drive one persistent
-    // oscillator each (packages/ui/src/sound.tsx), so sweeping/holding never spawns nodes.
-    sweepTone(ndc.current.inside, Math.max(0, 1 - nearDist / 0.9));
+    // A soft "vroom" while the cursor is actually sweeping (speed-driven, so a still
+    // cursor goes quiet even mid-hover), and a deeper "hum" that builds with the
+    // existing hold-to-scan progress — both drive one persistent drone each
+    // (packages/ui/src/sound.tsx), so sweeping/holding never spawns nodes.
+    const nearness = Math.max(0, 1 - nearDist / 1.4);
+    sweepTone(ndc.current.inside, Math.min(1, speed / 9) * nearness);
     holdTone(hd > 0, hd);
 
     // Particles: sparks lift off lit bars near the front and near the cursor.
