@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { play } from "./sound";
 import { useAccent } from "./theme";
 import { useIsDark } from "./use-media";
 
@@ -30,6 +31,7 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     let w = 0;
     let h = 0;
     let raf = 0;
+    let lastNearIdx = -1; // bar index last ticked, so a still cursor stays silent
 
     const fg = () => (dark ? "230,230,227" : "20,20,20");
 
@@ -47,11 +49,18 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
       const unit = w / (widths.reduce((a, b) => a + b, 0) + widths.length * 0.6);
       const gap = unit * 0.6;
       let x = 0;
+      let nearIdx = -1;
+      let nearDist = Infinity;
       ctx!.clearRect(0, 0, w, h);
       for (let i = 0; i < widths.length; i++) {
         const bw = widths[i]! * unit;
         const cx = x + bw / 2;
         const d = (cx - mouse.x) / (w * 0.06);
+        const ad = Math.abs(d);
+        if (ad < nearDist) {
+          nearDist = ad;
+          nearIdx = i;
+        }
         const lift = mouse.inside ? Math.exp(-d * d) : 0;
         const idle = reduced ? 0 : Math.sin(t / 900 + i * 0.35) * 0.04;
         const target = 0.55 + lift * 0.45 + idle;
@@ -67,6 +76,12 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
         }
         x += bw + gap;
       }
+      // A click per bar the cursor passes — index-change gated, and play("tick") is
+      // itself rate-limited (./sound.tsx), so a fast swipe can't turn this into a buzz.
+      if (mouse.inside && nearDist < 0.6 && nearIdx !== lastNearIdx) {
+        lastNearIdx = nearIdx;
+        play("tick");
+      }
       raf = requestAnimationFrame(frame);
     }
 
@@ -76,6 +91,7 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     }
     function onLeave() {
       mouse = { ...mouse, inside: false };
+      lastNearIdx = -1;
     }
 
     resize();
