@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useInView, useMotionValueEvent, useScroll, use
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { Container } from "@repo/ui/container";
-import { play } from "@repo/ui/sound";
 import { Typewriter } from "@repo/ui/typewriter";
 import { useAccent } from "@repo/ui/theme";
 import { useIsDark } from "@repo/ui/use-media";
@@ -35,11 +34,10 @@ export function DataField() {
   useMotionValueEvent(scrollYProgress, "change", (v) => {
     setActive(v > 0 && v < 1);
     // Captions switch when a shape has mostly settled, not when the morph begins.
+    // (The "beat" sound itself now plays from particles-scene.tsx, gated on the
+    // particles actually having settled into the shape rather than this threshold.)
     const next = Math.min(3, Math.max(0, Math.round(((v - 0.18) / 0.64) * 3)));
-    setI((prev) => {
-      if (prev !== next) play("beat");
-      return next;
-    });
+    setI(next);
   });
   const beat = BEATS[i]!;
 

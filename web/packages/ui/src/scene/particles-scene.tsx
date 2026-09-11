@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { play } from "../sound";
 import { usePointer } from "../use-pointer";
 import { Resume } from "./resume";
 
@@ -152,6 +153,9 @@ function Field({
   eventSource: React.RefObject<HTMLElement | null>;
 }) {
   const points = useRef<THREE.Points>(null);
+  // Which of the 4 shapes (0..3) the field last settled into — starts at 0 (the initial
+  // cloud) so mounting doesn't itself count as an alignment.
+  const lastAligned = useRef(0);
   const { camera, raycaster, size } = useThree();
   const ndc = usePointer(eventSource);
   const pointer = useMemo(() => new THREE.Vector2(), []);
@@ -219,6 +223,14 @@ function Field({
     const u = material.uniforms;
     u.uTime!.value = clock.elapsedTime;
     u.uMorph!.value += (morph.get() - u.uMorph!.value) * k;
+    // A chime once the field has actually settled into a shape (not when the scroll
+    // merely crosses a threshold) — nearest-integer check with a tight tolerance so it
+    // fires once the morph value has essentially arrived, not mid-transition.
+    const nearest = Math.round(u.uMorph!.value);
+    if (nearest !== lastAligned.current && Math.abs(u.uMorph!.value - nearest) < 0.03) {
+      lastAligned.current = nearest;
+      play("beat");
+    }
     u.uDpr!.value = viewport.dpr;
     u.uSize!.value = size.width < 768 ? 3 : 4;
     pointer.set(ndc.current.x, ndc.current.y);
