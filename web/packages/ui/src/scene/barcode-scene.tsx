@@ -6,7 +6,7 @@ import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from "@re
 import { BlendFunction } from "postprocessing";
 import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { holdTone, play, sweepTone } from "../sound";
+import { holdTone, sweepTone } from "../sound";
 import { usePointer } from "../use-pointer";
 import { Resume } from "./resume";
 import * as THREE from "three";
@@ -87,9 +87,6 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
       seeds,
       pos: new Float32Array(PARTICLES * 3),
       alpha: new Float32Array(PARTICLES),
-      // Bar index last ticked for the scroll-driven scan front — -1 so the very
-      // first lit bar still ticks.
-      lastFrontIdx: -1,
     };
   }, [bars.length]);
 
@@ -124,10 +121,8 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     const radius = hd * total * 0.6;
     state.base.set(dark ? "#3a3a37" : "#c9c4b6");
 
-    // Bars are laid out left-to-right, so "how far the front has swept" is just the index
-    // of the last bar behind it, and "distance to the nearest bar" falls out of the same
-    // per-bar loop below — no extra pass needed for either.
-    let frontIdx = -1;
+    // "Distance to the nearest bar" falls out of the same per-bar loop below — no
+    // extra pass needed.
     let nearDist = Infinity;
 
     for (let i = 0; i < bars.length; i++) {
@@ -135,7 +130,6 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
       const d = b.x - state.mouseX;
       const ad = Math.abs(d);
       if (ad < nearDist) nearDist = ad;
-      if (b.x < front) frontIdx = i;
       const lift = Math.exp(-(d * d) / 0.6);
       const idle = reduced ? 0 : Math.sin(t * 1.1 + b.x * 0.9) * 0.05;
       // Ripple: the scan front pushes a wave through the wall as it passes.
@@ -161,13 +155,6 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     im.instanceMatrix.needsUpdate = true;
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
 
-    // A click per bar as the scan front sweeps past it — index comparison, so silent
-    // (and free) whenever nothing's scrolling. play("tick") is itself rate-limited
-    // (packages/ui/src/sound.tsx), so a fast scroll can't turn this into a buzz.
-    if (frontIdx >= 0 && frontIdx !== state.lastFrontIdx) {
-      state.lastFrontIdx = frontIdx;
-      play("tick");
-    }
     // A soft "vroom" while the cursor is actually sweeping (speed-driven, so a still
     // cursor goes quiet even mid-hover), and a deeper "hum" that builds with the
     // existing hold-to-scan progress — both drive one persistent drone each
