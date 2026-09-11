@@ -15,14 +15,10 @@ const FILES: Record<Cue, string> = {
 };
 const GAIN: Record<Cue, number> = { scan: 0.35, tick: 0.12, verify: 0.35, open: 0.25, beat: 0.2 };
 
-const KEY = "truelabel:sound";
-// Restored here so a saved preference survives a reload, not just a re-render.
+// Starts off on every load — the toggle click that turns it on is itself the user
+// gesture browsers require before an AudioContext may play, so there's nothing to
+// restore or unlock separately.
 let enabled = false;
-if (typeof window !== "undefined") {
-  try {
-    enabled = localStorage.getItem(KEY) === "1";
-  } catch {}
-}
 let ctx: AudioContext | null = null;
 const buffers = new Map<Cue, AudioBuffer>();
 const listeners = new Set<() => void>();
@@ -60,18 +56,6 @@ function context() {
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
-}
-
-// Browsers only let a real user gesture unlock audio. A hover over the bars doesn't
-// count, so with "sound on" restored from a prior visit, nothing would play until the
-// user happened to click something that itself calls play()/sweepTone()/holdTone().
-// This unlocks on the very first click/key/touch anywhere on the page instead.
-if (typeof window !== "undefined") {
-  const unlock = () => {
-    if (enabled) context();
-  };
-  window.addEventListener("pointerdown", unlock, { once: true, capture: true });
-  window.addEventListener("keydown", unlock, { once: true, capture: true });
 }
 
 function tone(ac: AudioContext, freq: number, at: number, dur: number, gain: number, type: OscillatorType = "sine") {
@@ -132,9 +116,6 @@ export function play(cue: Cue) {
 
 export function setSound(next: boolean) {
   enabled = next;
-  try {
-    localStorage.setItem(KEY, next ? "1" : "0");
-  } catch {}
   if (next) {
     const ac = context();
     void ensureLoaded(ac).then(() => play("open"));
