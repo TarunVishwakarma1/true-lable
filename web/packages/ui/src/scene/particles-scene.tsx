@@ -104,7 +104,7 @@ function shapes() {
 
 const VERT = /* glsl */ `
   attribute vec3 aB; attribute vec3 aC; attribute vec3 aD; attribute float aSeed;
-  uniform float uMorph; uniform float uTime; uniform vec3 uMouse; uniform float uSize; uniform float uDpr;
+  uniform float uMorph; uniform float uTime; uniform vec3 uMouse; uniform float uStrength; uniform float uSize; uniform float uDpr;
   varying float vSeed; varying float vK;
   float ease(float t){ return t*t*(3.0-2.0*t); }
   void main(){
@@ -119,9 +119,11 @@ const VERT = /* glsl */ `
     // Idle drift, damped on the barcode so its edges stay sharp.
     float still = 1.0 - smoothstep(0.7, 1.0, m) * (1.0 - smoothstep(1.0, 1.3, m));
     p += vec3(sin(uTime*0.4+aSeed*9.0), cos(uTime*0.3+aSeed*5.0), 0.0) * 0.025 * still;
-    // Cursor pushes points aside.
+    // Cursor pushes points aside. uMouse is always the cursor's exact current position —
+    // uStrength (not distance to some "parked" position) is what fades the push in/out,
+    // so there's nothing for the effect to visibly travel from when it fades in.
     vec2 d = p.xy - uMouse.xy; float l = length(d);
-    p.xy += normalize(d + 0.0001) * smoothstep(1.1, 0.0, l) * 0.5;
+    p.xy += normalize(d + 0.0001) * smoothstep(1.1, 0.0, l) * 0.5 * uStrength;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_PointSize = uSize * uDpr * (0.6 + aSeed * 0.9) * (7.0 / -mv.z);
     gl_Position = projectionMatrix * mv;
@@ -175,7 +177,8 @@ function Field({
         uniforms: {
           uMorph: { value: 0 },
           uTime: { value: 0 },
-          uMouse: { value: new THREE.Vector3(99, 99, 0) },
+          uMouse: { value: new THREE.Vector3() },
+          uStrength: { value: 0 },
           uSize: { value: 4 },
           uDpr: { value: 1 },
           uAccent: { value: new THREE.Color(accent) },
@@ -223,8 +226,10 @@ function Field({
     hitCam.aspect = size.width / size.height;
     hitCam.updateProjectionMatrix();
     raycaster.setFromCamera(pointer, hitCam);
-    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.lerp(hit, k);
-    else u.uMouse!.value.lerp(target.set(99, 99, 0), k);
+    // Snap straight to the cursor's world position — no lag, so there's nothing to sweep
+    // in from. uStrength (below) is what fades the effect in/out, not this position.
+    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.copy(hit);
+    u.uStrength!.value += ((ndc.current.inside ? 1 : 0) - u.uStrength!.value) * k;
 
     // Gentle camera parallax against the cursor — purely decorative, doesn't feed back
     // into the hit-test above.
