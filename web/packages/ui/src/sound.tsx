@@ -62,6 +62,18 @@ function context() {
   return ctx;
 }
 
+// Browsers only let a real user gesture unlock audio. A hover over the bars doesn't
+// count, so with "sound on" restored from a prior visit, nothing would play until the
+// user happened to click something that itself calls play()/sweepTone()/holdTone().
+// This unlocks on the very first click/key/touch anywhere on the page instead.
+if (typeof window !== "undefined") {
+  const unlock = () => {
+    if (enabled) context();
+  };
+  window.addEventListener("pointerdown", unlock, { once: true, capture: true });
+  window.addEventListener("keydown", unlock, { once: true, capture: true });
+}
+
 function tone(ac: AudioContext, freq: number, at: number, dur: number, gain: number, type: OscillatorType = "sine") {
   const o = ac.createOscillator();
   const g = ac.createGain();
