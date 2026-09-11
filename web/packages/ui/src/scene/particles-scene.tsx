@@ -208,13 +208,19 @@ function Field({
     u.uDpr!.value = viewport.dpr;
     u.uSize!.value = size.width < 768 ? 3 : 4;
     pointer.set(ndc.current.x, ndc.current.y);
-    raycaster.setFromCamera(pointer, camera);
-    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.lerp(hit, k);
-    else u.uMouse!.value.lerp(target.set(99, 99, 0), k);
-    // Gentle camera parallax against the cursor.
+
+    // Gentle camera parallax against the cursor. Move it and refresh its world matrix
+    // *before* raycasting below — three.js only recomputes matrixWorld when the renderer
+    // draws, so raycasting first would hit-test against last frame's camera pose while a
+    // pointer-driven camera keeps chasing the cursor, making the hit drift off target.
     target.set(pointer.x * 0.35, pointer.y * 0.25, size.width < 768 ? 9.5 : 7);
     camera.position.lerp(target, k * 0.5);
     camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+
+    raycaster.setFromCamera(pointer, camera);
+    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.lerp(hit, k);
+    else u.uMouse!.value.lerp(target.set(99, 99, 0), k);
   });
 
   return <points ref={points} geometry={geometry} material={material} frustumCulled={false} />;
