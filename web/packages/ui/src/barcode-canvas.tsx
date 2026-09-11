@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { play } from "./sound";
+import { holdTone, sweepTone } from "./sound";
 import { useAccent } from "./theme";
 import { useIsDark } from "./use-media";
 
@@ -31,7 +31,8 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     let w = 0;
     let h = 0;
     let raf = 0;
-    let lastNearIdx = -1; // bar index last ticked, so a still cursor stays silent
+    let held = false;
+    let heldAt = 0;
 
     const fg = () => (dark ? "230,230,227" : "20,20,20");
 
@@ -49,7 +50,6 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
       const unit = w / (widths.reduce((a, b) => a + b, 0) + widths.length * 0.6);
       const gap = unit * 0.6;
       let x = 0;
-      let nearIdx = -1;
       let nearDist = Infinity;
       ctx!.clearRect(0, 0, w, h);
       for (let i = 0; i < widths.length; i++) {
@@ -57,10 +57,7 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
         const cx = x + bw / 2;
         const d = (cx - mouse.x) / (w * 0.06);
         const ad = Math.abs(d);
-        if (ad < nearDist) {
-          nearDist = ad;
-          nearIdx = i;
-        }
+        if (ad < nearDist) nearDist = ad;
         const lift = mouse.inside ? Math.exp(-d * d) : 0;
         const idle = reduced ? 0 : Math.sin(t / 900 + i * 0.35) * 0.04;
         const target = 0.55 + lift * 0.45 + idle;
@@ -76,12 +73,11 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
         }
         x += bw + gap;
       }
-      // A click per bar the cursor passes — index-change gated, and play("tick") is
-      // itself rate-limited (./sound.tsx), so a fast swipe can't turn this into a buzz.
-      if (mouse.inside && nearDist < 0.6 && nearIdx !== lastNearIdx) {
-        lastNearIdx = nearIdx;
-        play("tick");
-      }
+      // A bassy "voom" that swells as the cursor nears a bar, and a deeper "hum" that
+      // builds while pressed — both drive one persistent oscillator each (./sound.tsx),
+      // so sweeping or holding never spawns nodes.
+      sweepTone(mouse.inside, Math.max(0, 1 - nearDist / 1.2));
+      holdTone(held, held ? Math.min(1, (t - heldAt) / 900) : 0);
       raf = requestAnimationFrame(frame);
     }
 
@@ -91,7 +87,14 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     }
     function onLeave() {
       mouse = { ...mouse, inside: false };
-      lastNearIdx = -1;
+    }
+    function onDown(e: PointerEvent) {
+      held = true;
+      heldAt = performance.now();
+      onMove(e);
+    }
+    function onUp() {
+      held = false;
     }
 
     resize();
@@ -99,12 +102,21 @@ export function BarcodeCanvas({ seed = SEED, className = "block h-32 w-full sm:h
     ro.observe(canvas);
     canvas.addEventListener("mousemove", onMove);
     canvas.addEventListener("mouseleave", onLeave);
+    canvas.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mouseleave", onLeave);
+      canvas.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      // Silence the shared drones so a mid-gesture unmount can't leave them humming.
+      sweepTone(false);
+      holdTone(false);
     };
   }, [dark, seed, rgb]);
 

@@ -27,15 +27,10 @@ let ctx: AudioContext | null = null;
 const buffers = new Map<Cue, AudioBuffer>();
 const listeners = new Set<() => void>();
 let lastTick = 0;
+let loading: Promise<void> | null = null;
 
 function emit() {
   for (const l of listeners) l();
-}
-
-function context() {
-  if (!ctx) ctx = new AudioContext();
-  if (ctx.state === "suspended") void ctx.resume();
-  return ctx;
 }
 
 async function load(ac: AudioContext) {
@@ -49,6 +44,22 @@ async function load(ac: AudioContext) {
       } catch {}
     }),
   );
+}
+
+// Memoized so the buffers fetch exactly once, whether kicked off by a restored
+// "sound on" preference at first play() or by flipping the toggle live.
+function ensureLoaded(ac: AudioContext) {
+  if (!loading) loading = load(ac);
+  return loading;
+}
+
+function context() {
+  if (!ctx) {
+    ctx = new AudioContext();
+    void ensureLoaded(ctx);
+  }
+  if (ctx.state === "suspended") void ctx.resume();
+  return ctx;
 }
 
 function tone(ac: AudioContext, freq: number, at: number, dur: number, gain: number, type: OscillatorType = "sine") {
@@ -114,9 +125,64 @@ export function setSound(next: boolean) {
   } catch {}
   if (next) {
     const ac = context();
-    void load(ac).then(() => play("open"));
+    void ensureLoaded(ac).then(() => play("open"));
   }
   emit();
+}
+
+type Drone = { osc: OscillatorNode; filter: BiquadFilterNode; gain: GainNode };
+let sweepDrone: Drone | null = null;
+let holdDrone: Drone | null = null;
+
+// One persistent oscillator per drone, reused for the whole session — a fast swipe
+// or a long hold only ever ramps its gain/pitch, never spawns a node.
+function drone(ac: AudioContext, type: OscillatorType, freq: number, q: number) {
+  const osc = ac.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const filter = ac.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = freq * 4;
+  filter.Q.value = q;
+  const gain = ac.createGain();
+  gain.gain.value = 0;
+  osc.connect(filter).connect(gain).connect(ac.destination);
+  osc.start();
+  return { osc, filter, gain };
+}
+
+// A bassy "voooommmm" while the cursor sweeps across bars. `intensity` (0..1) is
+// proximity to the nearest bar — it drives gain and pitch, so the sound swells in
+// and out on its own as the cursor nears or leaves, no on/off click at a threshold.
+export function sweepTone(active: boolean, intensity = 1) {
+  if (typeof window === "undefined") return;
+  if (!enabled || !active) {
+    sweepDrone?.gain.gain.setTargetAtTime(0, sweepDrone.gain.context.currentTime, 0.08);
+    return;
+  }
+  const ac = context();
+  if (!sweepDrone) sweepDrone = drone(ac, "sawtooth", 55, 0.8);
+  const now = ac.currentTime;
+  const k = Math.max(0, Math.min(1, intensity));
+  sweepDrone.gain.gain.setTargetAtTime(k * 0.09, now, 0.06);
+  sweepDrone.osc.frequency.setTargetAtTime(48 + k * 40, now, 0.08);
+  sweepDrone.filter.frequency.setTargetAtTime(200 + k * 500, now, 0.08);
+}
+
+// A deeper "hoooommmm" that builds while the cursor is pressed and held.
+// `progress` (0..1) is how far into the hold/press gesture it is.
+export function holdTone(active: boolean, progress = 0) {
+  if (typeof window === "undefined") return;
+  if (!enabled || !active) {
+    holdDrone?.gain.gain.setTargetAtTime(0, holdDrone.gain.context.currentTime, 0.1);
+    return;
+  }
+  const ac = context();
+  if (!holdDrone) holdDrone = drone(ac, "triangle", 44, 1.4);
+  const now = ac.currentTime;
+  const k = Math.max(0, Math.min(1, progress));
+  holdDrone.gain.gain.setTargetAtTime(0.05 + k * 0.09, now, 0.12);
+  holdDrone.osc.frequency.setTargetAtTime(40 + k * 34, now, 0.18);
 }
 
 function subscribe(l: () => void) {

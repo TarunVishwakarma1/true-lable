@@ -6,7 +6,7 @@ import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from "@re
 import { BlendFunction } from "postprocessing";
 import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { play } from "../sound";
+import { holdTone, play, sweepTone } from "../sound";
 import { usePointer } from "../use-pointer";
 import { Resume } from "./resume";
 import * as THREE from "three";
@@ -56,6 +56,12 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
   const pointer = useMemo(() => new THREE.Vector2(), []);
   const ACCENT = useMemo(() => new THREE.Color(accent).multiplyScalar(BOOST), [accent]);
 
+  // Silence the shared drones so a mid-gesture unmount can't leave them humming.
+  useEffect(() => () => {
+    sweepTone(false);
+    holdTone(false);
+  }, []);
+
   const state = useMemo(() => {
     const seeds = new Float32Array(PARTICLES * 4);
     for (let i = 0; i < PARTICLES; i++) {
@@ -80,10 +86,9 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
       seeds,
       pos: new Float32Array(PARTICLES * 3),
       alpha: new Float32Array(PARTICLES),
-      // Bar index last ticked for the scroll-driven scan front and for cursor proximity —
-      // -1 so the very first lit bar still ticks.
+      // Bar index last ticked for the scroll-driven scan front — -1 so the very
+      // first lit bar still ticks.
       lastFrontIdx: -1,
-      lastNearIdx: -1,
     };
   }, [bars.length]);
 
@@ -99,8 +104,6 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     raycaster.setFromCamera(pointer, camera);
     if (ndc.current.inside && raycaster.ray.intersectPlane(PLANE, state.hit)) {
       state.mouseX += (state.hit.x - state.mouseX) * k;
-    } else {
-      state.lastNearIdx = -1; // re-entering the same bar should still tick
     }
 
     // Scroll drives the camera and the scan front along the wall. Portrait screens
@@ -117,20 +120,16 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     state.base.set(dark ? "#3a3a37" : "#c9c4b6");
 
     // Bars are laid out left-to-right, so "how far the front has swept" is just the index
-    // of the last bar behind it, and "the bar nearest the cursor" falls out of the same
+    // of the last bar behind it, and "distance to the nearest bar" falls out of the same
     // per-bar loop below — no extra pass needed for either.
     let frontIdx = -1;
-    let nearIdx = -1;
     let nearDist = Infinity;
 
     for (let i = 0; i < bars.length; i++) {
       const b = bars[i]!;
       const d = b.x - state.mouseX;
       const ad = Math.abs(d);
-      if (ad < nearDist) {
-        nearDist = ad;
-        nearIdx = i;
-      }
+      if (ad < nearDist) nearDist = ad;
       if (b.x < front) frontIdx = i;
       const lift = Math.exp(-(d * d) / 0.6);
       const idle = reduced ? 0 : Math.sin(t * 1.1 + b.x * 0.9) * 0.05;
@@ -157,18 +156,18 @@ function Bars({ progress, hold, dark, reduced, accent, eventSource }: Props) {
     im.instanceMatrix.needsUpdate = true;
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
 
-    // A click per bar as the scan front sweeps past it, and per bar the cursor passes
-    // over — both index comparisons, so silent (and free) whenever nothing's moving.
-    // play("tick") is itself rate-limited (packages/ui/src/sound.tsx), so a fast scroll
-    // or swipe can't turn this into a buzz.
+    // A click per bar as the scan front sweeps past it — index comparison, so silent
+    // (and free) whenever nothing's scrolling. play("tick") is itself rate-limited
+    // (packages/ui/src/sound.tsx), so a fast scroll can't turn this into a buzz.
     if (frontIdx >= 0 && frontIdx !== state.lastFrontIdx) {
       state.lastFrontIdx = frontIdx;
       play("tick");
     }
-    if (ndc.current.inside && nearDist < 0.4 && nearIdx !== state.lastNearIdx) {
-      state.lastNearIdx = nearIdx;
-      play("tick");
-    }
+    // A bassy "voom" that swells as the cursor nears a bar, and a deeper "hum" that
+    // builds with the existing hold-to-scan progress — both drive one persistent
+    // oscillator each (packages/ui/src/sound.tsx), so sweeping/holding never spawns nodes.
+    sweepTone(ndc.current.inside, Math.max(0, 1 - nearDist / 0.9));
+    holdTone(hd > 0, hd);
 
     // Particles: sparks lift off lit bars near the front and near the cursor.
     const pts = points.current;
