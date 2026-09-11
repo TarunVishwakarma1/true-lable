@@ -199,6 +199,17 @@ function Field({
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
   const hit = useMemo(() => new THREE.Vector3(), []);
   const target = useMemo(() => new THREE.Vector3(), []);
+  // A static stand-in for the camera, used only to turn the cursor into a world point.
+  // The real `camera` drifts for the parallax effect below; raycasting through that
+  // moving camera would make the hit-test chase wherever the camera last settled
+  // instead of the cursor. This one never moves, so NDC -> world stays exact and instant.
+  const hitCam = useMemo(() => {
+    const c = new THREE.PerspectiveCamera(40, 1, 0.1, 40);
+    c.position.set(0, 0, 7);
+    c.lookAt(0, 0, 0);
+    c.updateMatrixWorld();
+    return c;
+  }, []);
 
   useFrame(({ clock, viewport }, dt) => {
     const k = 1 - Math.exp(-dt * 6);
@@ -209,18 +220,17 @@ function Field({
     u.uSize!.value = size.width < 768 ? 3 : 4;
     pointer.set(ndc.current.x, ndc.current.y);
 
-    // Gentle camera parallax against the cursor. Move it and refresh its world matrix
-    // *before* raycasting below — three.js only recomputes matrixWorld when the renderer
-    // draws, so raycasting first would hit-test against last frame's camera pose while a
-    // pointer-driven camera keeps chasing the cursor, making the hit drift off target.
+    hitCam.aspect = size.width / size.height;
+    hitCam.updateProjectionMatrix();
+    raycaster.setFromCamera(pointer, hitCam);
+    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.lerp(hit, k);
+    else u.uMouse!.value.lerp(target.set(99, 99, 0), k);
+
+    // Gentle camera parallax against the cursor — purely decorative, doesn't feed back
+    // into the hit-test above.
     target.set(pointer.x * 0.35, pointer.y * 0.25, size.width < 768 ? 9.5 : 7);
     camera.position.lerp(target, k * 0.5);
     camera.lookAt(0, 0, 0);
-    camera.updateMatrixWorld();
-
-    raycaster.setFromCamera(pointer, camera);
-    if (ndc.current.inside && raycaster.ray.intersectPlane(plane, hit)) u.uMouse!.value.lerp(hit, k);
-    else u.uMouse!.value.lerp(target.set(99, 99, 0), k);
   });
 
   return <points ref={points} geometry={geometry} material={material} frustumCulled={false} />;
