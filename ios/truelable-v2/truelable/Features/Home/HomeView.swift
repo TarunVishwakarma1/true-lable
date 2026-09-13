@@ -16,28 +16,40 @@ struct HomeView: View {
     @AppStorage(Keys.verifiedCount) private var verifiedCount = 0
     @AppStorage(Keys.dietary) private var dietaryRaw = ""
     @State private var queueCount = 0
+    @State private var trending: [ProductCard] = []
+    private let plus = Plus.shared
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                headline
-                searchBar
-                stats
-                if !records.isEmpty { recents }
-                Spacer(minLength: 0)
-                nudge
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    headline
+                    searchBar
+                    stats
+                    if !records.isEmpty { recents }
+                    if !trending.isEmpty { popular }
+                    if !plus.isActive { PlusBanner() }
+                    nudge
+                }
+                .padding(.horizontal, TL.gutter)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, TL.gutter)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { barcode in
                 ProductLoaderScreen(barcode: barcode, initial: records.first { $0.barcode == barcode }?.product)
             }
-            .task { queueCount = (try? await API.needsVerification(limit: 12).count) ?? 0 }
+            .task {
+                async let queue = API.needsVerification(limit: 12)
+                async let popular = API.trending(limit: 6)
+                queueCount = (try? await queue.count) ?? 0
+                let found = (try? await popular) ?? []
+                withAnimation(.tl(0.4)) { trending = found }
+            }
         }
     }
 
@@ -144,6 +156,27 @@ struct HomeView: View {
         }
     }
 
+    private var popular: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionHeader(title: "Popular in \(API.country)")
+                NavigationLink("See all") { SearchScreen() }
+                    .font(.footnote.weight(.semibold))
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(trending.prefix(4).enumerated()), id: \.element.id) { index, card in
+                    if index > 0 { Divider().overlay(TL.line) }
+                    NavigationLink(value: card.barcode) {
+                        ProductCardRow(card: card)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.pressable)
+                }
+            }
+        }
+        .card()
+    }
+
     /// One slot, first match wins — a stack of nudges is what pushed this
     /// page past a screen in the first place.
     @ViewBuilder
@@ -188,7 +221,7 @@ struct RecentCard: View {
             HStack(alignment: .top) {
                 ProductThumb(url: record.imageURL, size: 52, radius: 14)
                 Spacer()
-                if let grade = record.nutriscoreGrade { GradeBadge(grade: grade) }
+                GradeBadge(grade: record.nutriscoreGrade)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.name)

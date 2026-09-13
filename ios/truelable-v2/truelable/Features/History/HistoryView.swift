@@ -165,7 +165,7 @@ struct HistoryView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                if let grade = record.nutriscoreGrade { GradeBadge(grade: grade) }
+                GradeBadge(grade: record.nutriscoreGrade)
                 if record.verified {
                     Image(systemName: "checkmark.seal.fill").font(.caption).foregroundStyle(TL.accent)
                 }

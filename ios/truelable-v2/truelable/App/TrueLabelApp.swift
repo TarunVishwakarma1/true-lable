@@ -10,6 +10,12 @@ import SwiftData
 struct TrueLabelApp: App {
     @State private var router = AppRouter()
 
+    init() {
+        // Open Food Facts photos are immutable, so the default 20 MB shared
+        // cache is the only reason a thumbnail is ever fetched twice.
+        URLCache.shared = URLCache(memoryCapacity: 32 << 20, diskCapacity: 256 << 20)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

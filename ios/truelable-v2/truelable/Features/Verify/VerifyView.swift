@@ -102,7 +102,7 @@ struct VerifyView: View {
                     if let brand = c.brand { Text(brand).font(.footnote).foregroundStyle(TL.fg2) }
                 }
                 Spacer(minLength: 0)
-                if let g = c.nutriscoreGrade { GradeBadge(grade: g) }
+                GradeBadge(grade: c.nutriscoreGrade)
             }
             Divider().overlay(TL.line)
             VStack(spacing: 8) {

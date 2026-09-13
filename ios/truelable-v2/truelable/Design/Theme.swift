@@ -96,7 +96,8 @@ extension View {
     /// and a lit lip below it. Applied once per card subtree — nesting it
     /// doubles the effect and reads as a blur.
     func engraved(_ strength: Double = 1) -> some View {
-        shadow(color: .black.opacity(0.55 * strength), radius: 1, y: -0.5)
+        compositingGroup()
+            .shadow(color: .black.opacity(0.55 * strength), radius: 1, y: -0.5)
             .shadow(color: .white.opacity(0.16 * strength), radius: 0, y: 1)
     }
 

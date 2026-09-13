@@ -58,7 +58,7 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
         allergens = try c.decodeIfPresent(String.self, forKey: .allergens)?.nilIfBlank
         additives = try c.decodeIfPresent([String].self, forKey: .additives) ?? []
         novaGroup = try c.decodeIfPresent(Int.self, forKey: .novaGroup)
-        nutriscoreGrade = try c.decodeIfPresent(String.self, forKey: .nutriscoreGrade)?.nilIfBlank?.lowercased()
+        nutriscoreGrade = Nutriscore.letter(try c.decodeIfPresent(String.self, forKey: .nutriscoreGrade))
         isVegan = try c.decodeIfPresent(Bool.self, forKey: .isVegan)
         isVegetarian = try c.decodeIfPresent(Bool.self, forKey: .isVegetarian)
         isPalmOilFree = try c.decodeIfPresent(Bool.self, forKey: .isPalmOilFree)
@@ -129,11 +129,6 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
         [ingredients, allergens].compactMap { $0 }.joined(separator: " ").lowercased()
     }
 
-    func contains(anyOf words: [String]) -> Bool {
-        let text = ingredientText
-        return words.contains { text.contains($0) }
-    }
-
     var shareSummary: String {
         var lines = ["\(name)\(brand.map { " · \($0)" } ?? "")"]
         if let grade = nutriscoreGrade { lines.append("Nutri-Score \(grade.uppercased())") }
@@ -146,6 +141,18 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
 }
 
 enum Tone { case good, fair, poor }
+
+/// Open Food Facts also ships "unknown" and "not-applicable" in this field,
+/// and the column is wide enough to store them. Only a–e is printable.
+enum Nutriscore {
+    static let letters = ["a", "b", "c", "d", "e"]
+
+    static func letter(_ raw: String?) -> String? {
+        guard let g = raw?.trimmingCharacters(in: .whitespaces).lowercased(),
+              letters.contains(g) else { return nil }
+        return g
+    }
+}
 
 struct Nutrition: Codable, Hashable, Sendable {
     var energyKcal: Double?

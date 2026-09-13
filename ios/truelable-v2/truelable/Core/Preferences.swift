@@ -77,14 +77,16 @@ struct PersonalCheck: Identifiable, Hashable {
     var id: String { preference.rawValue }
 
     static func run(_ prefs: Set<DietaryPreference>, on p: Product) -> [PersonalCheck] {
-        DietaryPreference.allCases.filter(prefs.contains).map { pref in
-            let (status, message) = evaluate(pref, p)
+        let text = p.ingredientText
+        return DietaryPreference.allCases.filter(prefs.contains).map { pref in
+            let (status, message) = evaluate(pref, p, text)
             return PersonalCheck(preference: pref, status: status, message: message)
         }
     }
 
-    private static func evaluate(_ pref: DietaryPreference, _ p: Product) -> (Status, String) {
+    private static func evaluate(_ pref: DietaryPreference, _ p: Product, _ text: String) -> (Status, String) {
         let hasIngredients = p.ingredients != nil || p.allergens != nil
+        func has(_ words: [String]) -> Bool { words.contains { text.contains($0) } }
         switch pref {
         case .vegetarian:
             switch p.isVegetarian {
@@ -115,15 +117,15 @@ struct PersonalCheck: Identifiable, Hashable {
                 : (.caution, "Not a protein source · \(pr.compact) g/100g")
         case .peanutAllergy:
             guard hasIngredients else { return (.unknown, "Ingredients not listed") }
-            return p.contains(anyOf: ["peanut", "groundnut", "arachis"])
+            return has(["peanut", "groundnut", "arachis"])
                 ? (.avoid, "Contains peanuts") : (.good, "No peanuts listed")
         case .lactoseSensitive:
             guard hasIngredients else { return (.unknown, "Ingredients not listed") }
-            return p.contains(anyOf: ["milk", "lactose", "whey", "casein", "butter", "cream", "cheese", "ghee", "curd", "yogurt", "yoghurt", "paneer"])
+            return has(["milk", "lactose", "whey", "casein", "butter", "cream", "cheese", "ghee", "curd", "yogurt", "yoghurt", "paneer"])
                 ? (.caution, "Contains dairy") : (.good, "No dairy listed")
         case .glutenFree:
             guard hasIngredients else { return (.unknown, "Ingredients not listed") }
-            return p.contains(anyOf: ["wheat", "gluten", "barley", "rye", "maida", "semolina", "suji", "atta", "malt"])
+            return has(["wheat", "gluten", "barley", "rye", "maida", "semolina", "suji", "atta", "malt"])
                 ? (.avoid, "Contains gluten") : (.good, "No gluten sources listed")
         case .noPalmOil:
             switch p.isPalmOilFree {
@@ -131,12 +133,12 @@ struct PersonalCheck: Identifiable, Hashable {
             case false: return (.avoid, "Contains palm oil")
             default:
                 guard hasIngredients else { return (.unknown, "Ingredients not listed") }
-                return p.contains(anyOf: ["palm"]) ? (.avoid, "Contains palm oil") : (.good, "No palm oil listed")
+                return has(["palm"]) ? (.avoid, "Contains palm oil") : (.good, "No palm oil listed")
             }
         case .jain:
             if p.isVegetarian == false { return (.avoid, "Not vegetarian") }
             guard hasIngredients else { return (.unknown, "Ingredients not listed") }
-            return p.contains(anyOf: ["onion", "garlic", "potato", "carrot", "radish", "beetroot", "ginger", "turnip"])
+            return has(["onion", "garlic", "potato", "carrot", "radish", "beetroot", "ginger", "turnip"])
                 ? (.caution, "Has root vegetables or onion/garlic")
                 : (.good, "No root vegetables or onion/garlic listed")
         }

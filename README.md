@@ -334,6 +334,12 @@ Migrations run automatically at boot (`db::run_migrations`), in
 └────────────────────────────────────────────┘      └──────────────────────────────────────┘
 ```
 
+A fourth table, `users`, is one row per device — `device_id` (the primary
+key), `country`, `dietary_preferences` (a JSONB array), and the three Plus
+columns `plus_since` / `plus_expires_at` / `plus_source`. There are no
+accounts, so nothing links a row to a person beyond the vendor identifier the
+device already hands out.
+
 Notes that matter when querying:
 
 - **`nutrition_facts`** always carries the same thirteen keys — `energy_kcal`,
@@ -548,7 +554,128 @@ refreshed product in the standard envelope.
 
 ---
 
-### 7. Submit a label read on-device
+### 7. Profile
+
+`GET /api/v1/users/{device_id}/profile?country=IN`
+
+There are no accounts. `identifierForVendor` is the identity, and **reading a
+profile creates it**, so the client never needs a registration step. `country`
+seeds the row on first read and is ignored afterwards.
+
+```json
+{
+  "status": "success",
+  "data": {
+    "device_id": "9B1D6F20-80E2-47DB-9D9B-FDF6ECFA8B85",
+    "country": "IN",
+    "dietary_preferences": ["Vegetarian", "Low sugar"],
+    "subscription": { "tier": "plus", "active": true, "since": "2026-09-13T10:00:00Z", "expires_at": null, "source": "complimentary" },
+    "created_at": "2026-09-13T09:12:00Z"
+  }
+}
+```
+
+`PUT /api/v1/users/{device_id}/profile`
+
+```json
+{ "country": "IN", "dietary_preferences": ["Vegetarian", "Low sugar"], "display_name": "Tarun" }
+```
+
+`display_name` is settable here without an account — a name is not an
+identity, and it is the only thing a client can offer when Sign in with Apple
+is unavailable to it. An empty string clears it; absent leaves it alone.
+
+Every field is optional — absent means "leave it alone", so country can
+change without resending the preference list. The backend does not own the
+preference vocabulary (the app does, and it grows), so entries are stored as
+given, but trimmed, de-duplicated, and capped at 32 entries of 64 characters
+so one client cannot write an unbounded blob into a shared table. `device_id`
+must be 8–128 characters of `[A-Za-z0-9_-]`.
+
+---
+
+### 8. Subscription
+
+`GET /api/v1/users/{device_id}/subscription`
+`POST /api/v1/users/{device_id}/subscription` — activate
+`DELETE /api/v1/users/{device_id}/subscription` — cancel
+
+```json
+{ "tier": "plus", "active": true, "since": "2026-09-13T10:00:00Z", "expires_at": null, "source": "complimentary" }
+```
+
+**TrueLabel Plus is free right now, and there is no payment step.** `POST`
+takes no body: while Plus is complimentary, asking for it is the whole
+transaction. It sets `since` and leaves `expires_at` as `null`, which means
+*on, with no expiry* — `active` must never be computed in a way that reads a
+missing expiry as lapsed.
+
+`source` records how the tier was granted, `"complimentary"` today and
+`"paid"` once payments exist. When they do, `POST` takes a receipt, verifies
+it, and writes a real `expires_at`; the response shape does not change, so
+clients written against this contract keep working.
+
+The iOS client treats either the backend or a StoreKit entitlement as
+sufficient for Plus, so that switch needs no client change either.
+
+---
+
+### 9. Sign in, sign out, delete
+
+> **Sign in with Apple needs a paid Apple Developer Program team.** A personal
+> team cannot create a provisioning profile that declares the entitlement, so
+> signing fails outright rather than degrading. The iOS build therefore ships
+> with the capability off (`Capabilities.signInWithApple = false`, and no
+> `CODE_SIGN_ENTITLEMENTS` on the target) and the account page falls back to a
+> display name the person chooses, set through the profile endpoint. **The
+> backend below is live either way** — it verifies identity tokens as soon as
+> a build starts sending them, so enabling the capability is a client-only
+> change. See `truelable.entitlements` for the two switches.
+
+`POST /api/v1/users/{device_id}/link`
+
+```json
+{ "identity_token": "<Apple identity token>", "display_name": "Tarun Vishwakarma" }
+```
+
+Sign in with Apple is the only provider, so there are no passwords stored and
+no email to deliver. The token is verified end to end before anything is
+written — Apple's signature over Apple's published key, issued by Apple, with
+this app's bundle id as audience, unexpired. This endpoint is otherwise
+unauthenticated, so an unverified token would let a caller claim any account.
+Apple's keys are cached for six hours and re-fetched on an unknown key id.
+
+`display_name` is optional and must be sent by the client: Apple hands the
+name over on the **first authorization only** and never puts it in the token.
+`email` likewise arrives once, and the user may hide it, so both are stored
+with `COALESCE` and never blanked by a later sign-in.
+
+If that Apple identity already owns a row on another device, the account
+**moves**: Plus state and preferences come across, the old row is deleted, and
+that phone reverts to anonymous. One active device per account. There is no
+cross-device sync, so anything else would silently duplicate an entitlement.
+
+`POST /api/v1/users/{device_id}/unlink` detaches the identity and keeps the
+row, which is what signing out should do — the app keeps working and nothing
+is destroyed.
+
+`DELETE /api/v1/users/{device_id}` deletes the account for real, not a
+deactivation flag. The App Store requires any app that creates accounts to
+offer this from inside the app. Verifications the device submitted are left
+alone: they carry no identity beyond a device id, and removing them would
+silently unverify products other people rely on.
+
+The profile response carries an `identity` block alongside `subscription`:
+
+```json
+"identity": { "signed_in": true, "provider": "apple", "email": null, "display_name": "Tarun", "linked_at": "2026-09-13T10:00:00Z" }
+```
+
+`signed_in: false` is the normal state. Nothing in the app requires an account.
+
+---
+
+### 10. Submit a label read on-device
 
 `POST /api/v1/ocr/submit`
 

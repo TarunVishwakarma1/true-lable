@@ -120,7 +120,6 @@ struct Pill: View {
             Text(text).font(.caption.weight(.semibold))
         }
         .foregroundStyle(filled ? TL.ink : color)
-        .engraved(0.5)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(filled ? color : color.opacity(0.18), in: Capsule())
@@ -308,7 +307,7 @@ struct ProductCardRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 6) {
-                if let grade = card.nutriscoreGrade { GradeBadge(grade: grade) }
+                GradeBadge(grade: card.nutriscoreGrade)
                 if let trailing {
                     Text(trailing).font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(TL.accent)
                 }
@@ -320,17 +319,18 @@ struct ProductCardRow: View {
 }
 
 struct GradeBadge: View {
-    var grade: String
+    var grade: String?
     var size: CGFloat = 26
 
     var body: some View {
-        Text(grade.uppercased())
-            .font(.system(size: size * 0.5, weight: .heavy))
-            .foregroundStyle(TL.ink)
-            .engraved(0.5)
-            .frame(width: size, height: size)
-            .background(TL.grade(grade), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
-            .accessibilityLabel("Nutri-Score \(grade.uppercased())")
+        if let letter = Nutriscore.letter(grade) {
+            Text(letter.uppercased())
+                .font(.system(size: size * 0.5, weight: .heavy))
+                .foregroundStyle(TL.ink)
+                .frame(width: size, height: size)
+                .background(TL.grade(letter), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
+                .accessibilityLabel("Nutri-Score \(letter.uppercased())")
+        }
     }
 }
 
@@ -388,3 +388,38 @@ struct Backdrop: View {
     }
 }
 
+
+/// A highlight that slides back and forth along a shape's border. Ported
+/// from v1, where it marked the scan button as live. Rate-capped at 30fps —
+/// a slow breathing highlight reads no better at native refresh, and this
+/// one is on screen the whole time the app is.
+struct AnimatedGradientBorder<S: InsettableShape>: View {
+    var shape: S
+    var lineWidth: CGFloat = 1.5
+    var duration: Double = 2.5
+    var isPaused: Bool = false
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isPaused || reduceMotion)) { timeline in
+            let raw = timeline.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: duration) / duration
+            let progress = (1 - cos(.pi * 2 * raw)) / 2 // eased, seamless loop
+
+            shape.strokeBorder(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.06), location: 0),
+                        .init(color: .white.opacity(0.7), location: progress),
+                        .init(color: .white.opacity(0.06), location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth: lineWidth
+            )
+        }
+        .allowsHitTesting(false)
+    }
+}

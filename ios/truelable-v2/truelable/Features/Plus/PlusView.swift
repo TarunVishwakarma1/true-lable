@@ -19,6 +19,8 @@ struct PlusView: View {
             Group {
                 if plus.isActive {
                     active
+                } else if plus.isGiveaway {
+                    giveaway
                 } else {
                     store
                 }
@@ -32,6 +34,39 @@ struct PlusView: View {
         }
         .presentationBackground(TL.bg)
         .presentationCornerRadius(32)
+    }
+
+    /// Nothing is for sale yet, so the paywall is a switch. Same marketing,
+    /// no price, no obligation — and the copy says why rather than showing a
+    /// fake price.
+    private var giveaway: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                marketing
+                VStack(spacing: 10) {
+                    Button {
+                        Task {
+                            if await plus.activateGiveaway() { dismiss() }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if plus.busy { ProgressView().tint(TL.ink) }
+                            Text("Turn on Plus — free")
+                        }
+                    }
+                    .buttonStyle(.primary)
+                    .disabled(plus.busy)
+
+                    Text("Free while we build it. No card, no trial that bills you. If it ever costs money you'll be asked first.")
+                        .font(.caption)
+                        .foregroundStyle(TL.fg3)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private var store: some View {
@@ -54,10 +89,6 @@ struct PlusView: View {
 
     private var marketing: some View {
         VStack(alignment: .leading, spacing: 22) {
-            HStack(spacing: 10) {
-                BarcodeGlyph().frame(width: 44, height: 28)
-                PlusTag()
-            }
             Text("Everything you use\ntoday stays free.")
                 .font(.display(34))
                 .tracking(-0.6)
@@ -100,12 +131,20 @@ struct PlusView: View {
                 .foregroundStyle(TL.accent)
             Text("You're on Plus")
                 .font(.display(32))
-            Text("Trends, four-way compare and ranked swaps are all on. Thank you for keeping this independent.")
+            Text(plus.isComplimentary
+                 ? "Trends, four-way compare and ranked swaps are on, free while we build it."
+                 : "Trends, four-way compare and ranked swaps are all on. Thank you for keeping this independent.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
                 .multilineTextAlignment(.center)
             Spacer()
-            ManageSubscriptionButton()
+            if plus.isComplimentary {
+                Button("Turn Plus off") { Task { await plus.cancel() } }
+                    .buttonStyle(.secondary)
+                    .disabled(plus.busy)
+            } else {
+                ManageSubscriptionButton()
+            }
             Button("Done") { dismiss() }
                 .buttonStyle(.primary)
         }
@@ -143,7 +182,9 @@ struct PlusBanner: View {
                     HStack(spacing: 6) {
                         Text("TrueLabel Plus").font(.subheadline.weight(.semibold))
                     }
-                    Text(compact ? "Trends, four-way compare, ranked swaps." : "Trends over months, compare up to four, swaps ranked by any nutrient.")
+                    Text(Plus.shared.isGiveaway
+                         ? "Trends, four-way compare, ranked swaps — free right now."
+                         : "Trends over months, compare up to four, swaps ranked by any nutrient.")
                         .font(.footnote)
                         .foregroundStyle(TL.fg2)
                         .lineLimit(2)

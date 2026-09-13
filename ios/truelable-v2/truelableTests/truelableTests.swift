@@ -166,3 +166,15 @@ struct OCRDraftTests {
         #expect(d.ingredients == "Gram flour, Palm oil, Salt")
     }
 }
+
+struct NutriscoreTests {
+    @Test func onlyLettersSurvive() {
+        #expect(Nutriscore.letter("D") == "d")
+        #expect(Nutriscore.letter(" a ") == "a")
+        // The column is wide enough for these, and a badge can't print them.
+        #expect(Nutriscore.letter("unknown") == nil)
+        #expect(Nutriscore.letter("not-applicable") == nil)
+        #expect(Nutriscore.letter("") == nil)
+        #expect(Nutriscore.letter(nil) == nil)
+    }
+}

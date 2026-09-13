@@ -27,6 +27,7 @@ struct ProfileView: View {
             ScrollView {
                 GlassEffectContainer(spacing: 24) {
                     VStack(spacing: 24) {
+                        AccountCard()
                         stats
                         if !records.isEmpty { trends }
                         plusCard
@@ -42,6 +43,10 @@ struct ProfileView: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("You")
+        }
+        .task {
+            await Account.shared.refresh()
+            await Plus.shared.refresh()
         }
         .confirmationDialog("Clear scan history?", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("Clear \(records.count) products", role: .destructive) {

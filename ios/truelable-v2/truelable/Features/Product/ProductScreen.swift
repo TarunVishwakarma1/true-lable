@@ -99,6 +99,7 @@ struct ProductScreen: View {
             .blur(radius: 40)
             .opacity(0.45)
             .saturation(1.3)
+            .drawingGroup()
             .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
             .ignoresSafeArea()
             .allowsHitTesting(false)
@@ -136,6 +137,7 @@ struct ProductScreen: View {
                 }
             }
         }
+        .engraved()
         .padding(.vertical, 8)
     }
 
@@ -213,7 +215,7 @@ struct ComparePickerSheet: View {
                                                 .font(.caption).foregroundStyle(TL.fg3).lineLimit(1)
                                         }
                                         Spacer()
-                                        if let g = r.nutriscoreGrade { GradeBadge(grade: g) }
+                                        GradeBadge(grade: r.nutriscoreGrade)
                                     }
                                     .contentShape(Rectangle())
                                 }

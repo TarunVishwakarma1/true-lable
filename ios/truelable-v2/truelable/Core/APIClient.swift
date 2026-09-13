@@ -10,6 +10,14 @@
 //    GET  /api/v1/products/alternatives?barcode&country&sort_by&limit
 //    GET  /api/v1/products/needs-verification?country&device_id&limit
 //    POST /api/v1/products/verify   {barcode, country, device_id}
+//    GET  /api/v1/users/{id}/profile?country
+//    PUT  /api/v1/users/{id}/profile        {country?, dietary_preferences?}
+//    GET  /api/v1/users/{id}/subscription
+//    POST /api/v1/users/{id}/subscription   activate
+//    DELETE /api/v1/users/{id}/subscription cancel
+//    POST /api/v1/users/{id}/link          {identity_token, display_name?}
+//    POST /api/v1/users/{id}/unlink
+//    DELETE /api/v1/users/{id}              delete the account
 //    POST /api/v1/ocr/submit        {barcode, country, extracted_text, reviewed_ingredients,
 //                                    reviewed_allergens, product_name?, brand?, nutrition?}
 //
@@ -108,6 +116,75 @@ enum API {
         var nutrition: Nutrition?
     }
 
+    // MARK: Profile and subscription
+
+    /// Reading a profile creates it, so there is no registration step.
+    static func profile() async throws -> Profile {
+        let env: Envelope<Profile> = try await get("api/v1/users/\(try id())/profile", ["country": country])
+        guard let p = env.data else { throw APIError.invalid }
+        return p
+    }
+
+    /// Every field is optional on the wire: absent means "leave it alone",
+    /// so preferences and the display name are edited independently.
+    static func updateProfile(dietaryPreferences: [String]? = nil, displayName: String? = nil) async throws -> Profile {
+        struct Body: Encodable {
+            var country: String
+            var dietaryPreferences: [String]?
+            var displayName: String?
+        }
+        let env: Envelope<Profile> = try await put(
+            "api/v1/users/\(try id())/profile",
+            Body(country: country, dietaryPreferences: dietaryPreferences, displayName: displayName)
+        )
+        guard let p = env.data else { throw APIError.invalid }
+        return p
+    }
+
+    static func subscription() async throws -> Subscription {
+        let env: Envelope<Subscription> = try await get("api/v1/users/\(try id())/subscription", [:])
+        guard let s = env.data else { throw APIError.invalid }
+        return s
+    }
+
+    static func activatePlus() async throws -> Subscription {
+        let env: Envelope<Subscription> = try await send("api/v1/users/\(try id())/subscription", method: "POST")
+        guard let s = env.data else { throw APIError.invalid }
+        return s
+    }
+
+    static func cancelPlus() async throws -> Subscription {
+        let env: Envelope<Subscription> = try await send("api/v1/users/\(try id())/subscription", method: "DELETE")
+        guard let s = env.data else { throw APIError.invalid }
+        return s
+    }
+
+    static func linkApple(identityToken: String, displayName: String?) async throws -> Profile {
+        struct Body: Encodable { var identityToken: String; var displayName: String? }
+        let env: Envelope<Profile> = try await post("api/v1/users/\(try id())/link",
+                                                    Body(identityToken: identityToken, displayName: displayName))
+        guard let p = env.data else { throw APIError.invalid }
+        return p
+    }
+
+    static func unlinkApple() async throws -> Profile {
+        let env: Envelope<Profile> = try await send("api/v1/users/\(try id())/unlink", method: "POST")
+        guard let p = env.data else { throw APIError.invalid }
+        return p
+    }
+
+    static func deleteAccount() async throws {
+        struct Reply: Decodable { var deleted: Bool? }
+        let _: Envelope<Reply> = try await send("api/v1/users/\(try id())", method: "DELETE")
+    }
+
+    /// Every per-user call is keyed on identifierForVendor. It is nil only in
+    /// odd states (before first unlock), and there is nothing to fall back to.
+    private static func id() throws -> String {
+        guard let deviceID else { throw APIError.invalid }
+        return deviceID
+    }
+
     static func submitLabel(_ submission: LabelSubmission) async throws {
         struct Reply: Decodable { var guessedName: String? }
         let _: Reply = try await post("api/v1/ocr/submit", submission)
@@ -124,6 +201,21 @@ enum API {
         var components = URLComponents(url: APIEnvironment.baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         return try await run(URLRequest(url: components.url!))
+    }
+
+    private static func put<T: Decodable>(_ path: String, _ body: some Encodable) async throws -> T {
+        var request = URLRequest(url: APIEnvironment.baseURL.appending(path: path))
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+        return try await run(request)
+    }
+
+    /// A body-less POST or DELETE.
+    private static func send<T: Decodable>(_ path: String, method: String) async throws -> T {
+        var request = URLRequest(url: APIEnvironment.baseURL.appending(path: path))
+        request.httpMethod = method
+        return try await run(request)
     }
 
     private static func post<T: Decodable>(_ path: String, _ body: some Encodable) async throws -> T {
@@ -172,6 +264,33 @@ struct ProductCard: Decodable, Identifiable, Hashable, Sendable {
     var sortValue: Double?
 
     var imageURL: URL? { imageUrl.flatMap(URL.init(string:)) }
+}
+
+struct Profile: Decodable, Sendable {
+    var country: String
+    var dietaryPreferences: [String]
+    var subscription: Subscription
+    var identity: Identity
+}
+
+struct Identity: Decodable, Sendable {
+    var signedIn: Bool
+    var provider: String?
+    /// Apple sends this only on the first authorization, and the person can
+    /// hide it, so signed in without an email is normal.
+    var email: String?
+    var displayName: String?
+}
+
+/// `since` and `expiresAt` are on the wire too — decoded when something
+/// actually shows a renewal date, which nothing does while Plus is free.
+struct Subscription: Decodable, Sendable {
+    var tier: String
+    var active: Bool
+    var source: String?
+
+    /// How the tier was granted. `"complimentary"` is the free period.
+    var isComplimentary: Bool { source == "complimentary" }
 }
 
 struct Candidate: Decodable, Identifiable, Hashable, Sendable {

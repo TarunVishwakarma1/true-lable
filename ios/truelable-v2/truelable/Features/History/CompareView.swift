@@ -76,12 +76,8 @@ struct CompareView: View {
             rowLabel("Nutri-Score")
             ForEach(records) { r in
                 HStack {
-                    if let g = r.nutriscoreGrade {
-                        Text(g.uppercased())
-                            .font(.caption.weight(.heavy))
-                            .foregroundStyle(TL.ink)
-                            .frame(width: 26, height: 26)
-                            .background(TL.grade(g), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    if Nutriscore.letter(r.nutriscoreGrade) != nil {
+                        GradeBadge(grade: r.nutriscoreGrade)
                     } else {
                         Text("—").foregroundStyle(TL.fg3)
                     }

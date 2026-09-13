@@ -12,6 +12,7 @@ import SwiftData
 
 struct RootView: View {
     @AppStorage(Keys.onboarded) private var onboarded = false
+    @AppStorage(Keys.dietary) private var dietaryRaw = ""
     @Environment(AppRouter.self) private var router
 
     var body: some View {
@@ -31,6 +32,20 @@ struct RootView: View {
         .sheet(isPresented: $router.manualEntryPresented) {
             ManualEntrySheet()
         }
+        .task {
+            // Adopt the saved profile only when this device has none of its
+            // own — a fresh install after a reinstall, not an overwrite.
+            guard let profile = try? await API.profile(), !profile.dietaryPreferences.isEmpty,
+                  DietaryPreference.decode(dietaryRaw).isEmpty else { return }
+            dietaryRaw = DietaryPreference.encode(Set(profile.dietaryPreferences.compactMap(DietaryPreference.init(rawValue:))))
+        }
+        .onChange(of: dietaryRaw) { _, updated in
+            Task {
+                _ = try? await API.updateProfile(
+                    dietaryPreferences: DietaryPreference.decode(updated).map(\.rawValue)
+                )
+            }
+        }
     }
 
     private var tabs: some View {
@@ -47,33 +62,45 @@ struct RootView: View {
     }
 }
 
-/// The always-available scan button that rides above the tab bar.
+/// v1's scan button, in the place v2 keeps scanning: the tab bar accessory.
+/// Glass capsule, a highlight travelling its border, and the symbol swapping
+/// between the two things it reads. The system draws the glass here, so this
+/// adds the highlight and the swap rather than a second glass layer.
 private struct ScanAccessory: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+
+    @State private var showQR = true
 
     var body: some View {
         Button {
             router.scannerPresented = true
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "barcode.viewfinder")
-                    .font(.body.weight(.semibold))
+                Image(systemName: showQR ? "qrcode" : "barcode")
+                    .contentTransition(.symbolEffect(.replace))
                 Text(placement == .inline ? "Scan" : "Scan a product")
-                    .font(.subheadline.weight(.semibold))
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(TL.ink.opacity(0.7))
             }
-            .foregroundStyle(TL.ink)
-            .padding(.horizontal, 16)
+            .font(.headline)
+            .foregroundStyle(TL.fg)
+            .engraved()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(TL.accent)
             .contentShape(Rectangle())
+            .overlay {
+                AnimatedGradientBorder(shape: Capsule(), isPaused: router.scannerPresented)
+            }
         }
         .buttonStyle(.pressable)
         .accessibilityLabel("Scan a product")
+        // Paused while the scanner covers the screen — the accessory is
+        // still mounted and still rendering behind it.
+        .task(id: router.scannerPresented) {
+            guard !router.scannerPresented else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.2))
+                withAnimation { showQR.toggle() }
+            }
+        }
     }
 }
 
