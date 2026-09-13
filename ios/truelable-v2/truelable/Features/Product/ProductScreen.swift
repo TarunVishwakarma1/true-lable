@@ -9,12 +9,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ProductScreen: View {
     @State private var product: Product
     let inSheet: Bool
 
     @AppStorage(Keys.dietary) private var dietaryRaw = ""
+    @State private var comparePicker = false
 
     init(product: Product, inSheet: Bool = false) {
         _product = State(initialValue: product)
@@ -30,72 +32,131 @@ struct ProductScreen: View {
         ScrollView {
             VStack(spacing: 14) {
                 hero
-                VerdictCard(product: product)
+                VerdictCard(product: product).reveal()
                 if !checks.isEmpty {
-                    ForYouCard(checks: checks)
+                    ForYouCard(checks: checks).reveal()
                 }
-                MacroCard(product: product)
+                MacroCard(product: product).reveal()
                 if let sugar = product.nutrition.sugar {
-                    SugarCard(sugarGrams: sugar)
+                    SugarCard(sugarGrams: sugar).reveal()
                 }
                 if !product.nutrition.isEmpty {
-                    LabelCard(product: product)
+                    LabelCard(product: product).reveal()
                 }
                 if let ingredients = product.ingredients {
-                    IngredientsCard(text: ingredients)
+                    IngredientsCard(text: ingredients).reveal()
                 }
                 if !product.additives.isEmpty {
-                    AdditivesCard(codes: product.additives)
+                    AdditivesCard(codes: product.additives).reveal()
                 }
                 if let allergens = product.allergens {
-                    AllergensCard(raw: allergens)
+                    AllergensCard(raw: allergens).reveal()
                 }
                 AlternativesCard(product: product, prefs: DietaryPreference.decode(dietaryRaw))
-                CommunityCard(product: $product)
+                CommunityCard(product: $product).reveal()
+                compareCard.reveal()
                 footer
             }
             .padding(.horizontal, TL.gutter)
             .padding(.top, 8)
-            .padding(.bottom, 40)
+            .padding(.bottom, 24)
         }
+        .background(alignment: .top) { imageBleed }
         .scrollIndicators(.hidden)
         .screenBackground()
         .navigationTitle(inSheet ? "" : product.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Compare", systemImage: "arrow.left.arrow.right") { comparePicker = true }
                 ShareLink(item: product.shareSummary) {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
             if inSheet { CloseButton() }
         }
+        .sheet(isPresented: $comparePicker) {
+            ComparePickerSheet(current: product)
+        }
+    }
+
+    /// The product's own photo, blown up and blurred, bleeding from the
+    /// top — masked to nothing before the first card. Static, one image.
+    @ViewBuilder
+    private var imageBleed: some View {
+        if let url = product.imageURL {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                }
+            }
+            .frame(height: 280)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .blur(radius: 40)
+            .opacity(0.45)
+            .saturation(1.3)
+            .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
     }
 
     private var hero: some View {
-        HStack(alignment: .top, spacing: 16) {
-            ProductThumb(url: product.imageURL, size: 92, radius: 24)
-            VStack(alignment: .leading, spacing: 8) {
-                if let brand = product.brand {
-                    Eyebrow(text: brand)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 16) {
+                ProductThumb(url: product.imageURL, size: 104, radius: 26)
+                    .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let brand = product.brand { Eyebrow(text: brand) }
+                    Text(product.name)
+                        .font(.display(26))
+                        .tracking(-0.4)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(product.name)
-                    .font(.title2.weight(.bold))
-                    .tracking(-0.4)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
-                    if product.verified {
-                        Pill(text: "Verified", color: TL.accent, icon: "checkmark.seal.fill", filled: true)
-                    } else if product.isCommunitySourced {
-                        Pill(text: "Community", color: TL.warn, icon: "person.2.fill")
-                    } else {
-                        Pill(text: "Open Food Facts", color: TL.fg2, icon: "globe")
-                    }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 6) {
+                if product.verified {
+                    Pill(text: "Verified", color: TL.accent, icon: "checkmark.seal.fill", filled: true)
+                } else if product.isCommunitySourced {
+                    Pill(text: "Community", color: TL.warn, icon: "person.2.fill")
+                } else {
+                    Pill(text: "Open Food Facts", color: TL.fg2, icon: "globe")
+                }
+                if let grade = product.nutriscoreGrade {
+                    Pill(text: "Nutri-Score \(grade.uppercased())", color: TL.grade(grade))
+                }
+                if let nova = product.novaGroup {
+                    Pill(text: "NOVA \(nova)", color: TL.nova(nova))
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(.vertical, 8)
+    }
+
+    private var compareCard: some View {
+        Button { comparePicker = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.title3)
+                    .foregroundStyle(TL.info)
+                    .frame(width: 44, height: 44)
+                    .background(TL.info.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Line it up against something else")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Side by side with anything you've already scanned.")
+                        .font(.footnote)
+                        .foregroundStyle(TL.fg2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
+            }
+            .card(radius: 20, padding: 14)
+        }
+        .buttonStyle(.pressable)
     }
 
     private var footer: some View {
@@ -109,6 +170,102 @@ struct ProductScreen: View {
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 12)
+    }
+}
+
+/// Pick what to line this product up against, from history. Free: one
+/// other product. Plus: up to three.
+struct ComparePickerSheet: View {
+    let current: Product
+    @Query(sort: \ScanRecord.scannedAt, order: .reverse) private var records: [ScanRecord]
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<String> = []
+    @State private var comparing: [ScanRecord] = []
+    private let plus = Plus.shared
+
+    private var others: [ScanRecord] { records.filter { $0.barcode != current.barcode } }
+    private var limit: Int { (plus.isActive ? 4 : Plus.freeCompareLimit) - 1 }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if others.isEmpty {
+                    ContentUnavailableView("Nothing to compare yet", systemImage: "arrow.left.arrow.right",
+                                           description: Text("Scan another product and it'll show up here."))
+                } else {
+                    List {
+                        Section {
+                            ForEach(others) { r in
+                                Button {
+                                    toggle(r.barcode)
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: selected.contains(r.barcode) ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                            .foregroundStyle(selected.contains(r.barcode) ? TL.accent : TL.fg3)
+                                        ProductThumb(url: r.imageURL, size: 48, radius: 14)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(r.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                            Text(r.brand.isEmpty ? r.scannedAt.formatted(.relative(presentation: .named)) : r.brand)
+                                                .font(.caption).foregroundStyle(TL.fg3).lineLimit(1)
+                                        }
+                                        Spacer()
+                                        if let g = r.nutriscoreGrade { GradeBadge(grade: g) }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(TL.bg)
+                                .listRowSeparatorTint(TL.line)
+                            }
+                        } header: {
+                            Text(plus.isActive ? "Pick up to three" : "Pick one · Plus compares four")
+                        }
+                        if !plus.isActive {
+                            PlusGate(text: "Compare up to four at once").listRowBackground(TL.bg)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .screenBackground()
+            .navigationTitle("Compare with")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button("Compare \(selected.count + 1) products") {
+                    guard let me = records.first(where: { $0.barcode == current.barcode }) else { return }
+                    comparing = [me] + others.filter { selected.contains($0.barcode) }
+                }
+                .buttonStyle(.primary)
+                .disabled(selected.isEmpty)
+                .opacity(selected.isEmpty ? 0.5 : 1)
+                .padding(.horizontal, TL.gutter)
+                .padding(.vertical, 12)
+            }
+            .sheet(isPresented: Binding(get: { !comparing.isEmpty }, set: { if !$0 { comparing = [] } })) {
+                CompareView(records: comparing)
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(TL.bg)
+        .presentationCornerRadius(32)
+    }
+
+    private func toggle(_ barcode: String) {
+        withAnimation(.tl(0.25)) {
+            if selected.contains(barcode) {
+                selected.remove(barcode)
+            } else if selected.count < limit {
+                selected.insert(barcode)
+            } else if limit == 1 {
+                selected = [barcode]
+            }
+        }
     }
 }
 
@@ -128,5 +285,6 @@ struct ProductScreen: View {
             isVegan: true, isVegetarian: true, isPalmOilFree: false
         ))
     }
+    .modelContainer(for: ScanRecord.self, inMemory: true)
     .preferredColorScheme(.dark)
 }

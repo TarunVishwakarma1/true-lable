@@ -65,9 +65,9 @@ struct OnboardingView: View {
                 .frame(height: 96)
                 .padding(.bottom, 44)
             Text("Scan it.\nActually know it.")
-                .font(.system(size: 40, weight: .bold))
+                .font(.display(44))
                 .tracking(-1)
-                .lineSpacing(-2)
+                .lineSpacing(-4)
             Text("Point at any barcode and see what's really inside — sugar in teaspoons, additives by name, and whether it fits how you eat.")
                 .font(.body)
                 .foregroundStyle(TL.fg2)
@@ -81,7 +81,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
             Text("Verified by people,\nnot press releases.")
-                .font(.system(size: 34, weight: .bold))
+                .font(.display(36))
                 .tracking(-0.8)
             Text("Some data comes from Open Food Facts. Some comes from shoppers who photographed a label. You always see which — and you can confirm what you're holding.")
                 .font(.body)
@@ -118,7 +118,7 @@ struct OnboardingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Anything we should\nwatch for?")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.display(36))
                     .tracking(-0.8)
                     .padding(.top, 72)
                 Text("Pick what matters and every scan flags it first. Optional — change it anytime under You.")

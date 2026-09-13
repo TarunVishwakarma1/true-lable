@@ -53,7 +53,7 @@ struct VerifyView: View {
         VStack(spacing: 22) {
             VStack(spacing: 6) {
                 Text("Does this look right?")
-                    .font(.title2.weight(.bold))
+                    .font(.display(28))
                 Text("Someone added this label. Confirm only if you're holding the pack and it matches.")
                     .font(.subheadline)
                     .foregroundStyle(TL.fg2)
@@ -71,7 +71,7 @@ struct VerifyView: View {
                         .allowsHitTesting(offset == 0)
                 }
             }
-            .frame(height: 260)
+            .frame(height: 270)
             .padding(.horizontal, 28)
 
             Text("\(remaining.count) left · swipe right to confirm, left to skip")
@@ -96,9 +96,14 @@ struct VerifyView: View {
     private func card(_ c: Candidate, isTop: Bool) -> some View {
         let offset = isTop ? drag : .zero
         return VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(c.productName).font(.title3.weight(.bold)).lineLimit(2)
-                if let brand = c.brand { Text(brand).font(.footnote).foregroundStyle(TL.fg2) }
+            HStack(alignment: .top, spacing: 12) {
+                ProductThumb(url: c.imageURL, size: 56, radius: 16)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(c.productName).font(.display(20)).lineLimit(2)
+                    if let brand = c.brand { Text(brand).font(.footnote).foregroundStyle(TL.fg2) }
+                }
+                Spacer(minLength: 0)
+                if let g = c.nutriscoreGrade { GradeBadge(grade: g) }
             }
             Divider().overlay(TL.line)
             VStack(spacing: 8) {
@@ -114,7 +119,7 @@ struct VerifyView: View {
                 Text("\(c.verificationCount)/3").font(.caption2.weight(.semibold)).foregroundStyle(TL.fg3).padding(.leading, 6)
             }
         }
-        .frame(height: 240)
+        .frame(height: 250)
         .card(radius: 28, fill: TL.elevated)
         .overlay(alignment: .topTrailing) {
             if isTop {

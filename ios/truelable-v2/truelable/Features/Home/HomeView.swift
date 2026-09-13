@@ -2,9 +2,10 @@
 //  HomeView.swift
 //  truelable
 //
-//  The landing tab: one obvious action (scan), then the real content this
-//  device has generated — recent products, this week's pattern, and a nudge
-//  to help verify. Nothing here is placeholder; every number is earned.
+//  The landing tab: one obvious action (scan), a way in without the pack
+//  (search), then the real content this device has generated — recent
+//  products, what's popular nearby, this week's pattern. Nothing here is
+//  placeholder; every number is earned.
 //
 
 import SwiftUI
@@ -17,25 +18,27 @@ struct HomeView: View {
     @AppStorage(Keys.verifiedCount) private var verifiedCount = 0
     @AppStorage(Keys.dietary) private var dietaryRaw = ""
     @State private var queueCount: Int?
+    @State private var trending: [ProductCard] = []
+    @State private var trendWindow = 7
     @Namespace private var zoom
+    private let plus = Plus.shared
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 22) {
                     hero
+                    searchBar
                     stats
-                    if !records.isEmpty {
-                        recents
-                        week
-                    }
+                    if !records.isEmpty { recents }
+                    if !trending.isEmpty { popular }
+                    if !records.isEmpty { week }
+                    if !plus.isActive { PlusBanner().reveal() }
                     verifyNudge
-                    if DietaryPreference.decode(dietaryRaw).isEmpty {
-                        preferencesNudge
-                    }
+                    if DietaryPreference.decode(dietaryRaw).isEmpty { preferencesNudge }
                 }
                 .padding(.horizontal, TL.gutter)
-                .padding(.top, 8)
+                .padding(.top, 4)
                 .padding(.bottom, 32)
             }
             .background { Backdrop() }
@@ -47,7 +50,13 @@ struct HomeView: View {
                 ProductLoaderScreen(barcode: barcode, initial: records.first { $0.barcode == barcode }?.product)
                     .navigationTransition(.zoom(sourceID: barcode, in: zoom))
             }
-            .task { queueCount = try? await API.needsVerification(limit: 12).count }
+            .task {
+                async let queue = API.needsVerification(limit: 12)
+                async let popular = API.trending(limit: 10)
+                queueCount = try? await queue.count
+                let found = (try? await popular) ?? []
+                withAnimation(.tl(0.4)) { trending = found }
+            }
         }
     }
 
@@ -58,38 +67,32 @@ struct HomeView: View {
             HStack {
                 Eyebrow(text: greeting)
                 Spacer()
-                Pill(text: "\(API.country)", color: TL.fg2, icon: "globe")
+                Pill(text: API.country, color: TL.fg2, icon: "globe")
             }
             Text("What's really\nin it?")
-                .font(.system(size: 36, weight: .bold))
+                .font(.display(42))
                 .tracking(-1)
-                .lineSpacing(-2)
+                .lineSpacing(-4)
             Text("Point at a barcode. Sugar in teaspoons, additives by name, and whether it fits how you eat.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 10) {
-                Button {
-                    router.scannerPresented = true
-                } label: {
-                    Label("Scan", systemImage: "barcode.viewfinder")
-                }
-                .buttonStyle(.primary)
-
-                Button {
-                    router.manualEntryPresented = true
-                } label: {
-                    Image(systemName: "keyboard")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.secondary)
-                .frame(width: 56)
-                .accessibilityLabel("Type a barcode")
+            Button {
+                router.scannerPresented = true
+            } label: {
+                Label("Scan a barcode", systemImage: "barcode.viewfinder")
             }
+            .buttonStyle(.primary)
         }
-        .card(radius: 28, fill: TL.surface.opacity(0.85), padding: 22)
+        .card(radius: 30, fill: TL.surface, padding: 24)
+        .background {
+            // One warm accent glow bleeding out of the hero — static.
+            RadialGradient(colors: [TL.accent.opacity(0.22), .clear], center: .topTrailing, startRadius: 0, endRadius: 320)
+                .blur(radius: 30)
+                .offset(x: 40, y: -60)
+                .allowsHitTesting(false)
+        }
     }
 
     private var greeting: String {
@@ -101,22 +104,54 @@ struct HomeView: View {
         }
     }
 
+    private var searchBar: some View {
+        NavigationLink {
+            SearchScreen()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(TL.fg2)
+                Text("Search a product or brand")
+                    .font(.subheadline)
+                    .foregroundStyle(TL.fg3)
+                Spacer()
+                Button {
+                    router.manualEntryPresented = true
+                } label: {
+                    Image(systemName: "keyboard")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TL.fg2)
+                        .frame(width: 32, height: 32)
+                        .background(TL.elevated, in: Circle())
+                }
+                .buttonStyle(.pressable)
+                .accessibilityLabel("Type a barcode")
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 54)
+            .background(TL.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(TL.line))
+        }
+        .buttonStyle(.pressable)
+    }
+
     // MARK: Stats
 
     private var stats: some View {
         HStack(spacing: 10) {
             StatTile(value: "\(records.count)", label: "Products", icon: "barcode")
-            StatTile(value: "\(thisWeek)", label: "This week", icon: "calendar", tint: TL.info)
+            StatTile(value: "\(count(days: 7))", label: "This week", icon: "calendar", tint: TL.info)
             StatTile(value: "\(verifiedCount)", label: "Confirmed", icon: "checkmark.seal.fill", tint: TL.warn)
         }
     }
 
-    private var thisWeek: Int {
-        let start = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: .now))!
+    private func count(days: Int) -> Int {
+        let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: Calendar.current.startOfDay(for: .now))!
         return records.filter { $0.scannedAt >= start }.count
     }
 
-    // MARK: Recents
+    // MARK: Strips
 
     private var recents: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -128,11 +163,9 @@ struct HomeView: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 10) {
                     ForEach(records.prefix(8)) { record in
-                        NavigationLink(value: record.barcode) {
-                            RecentCard(record: record)
-                        }
-                        .buttonStyle(.pressable)
-                        .matchedTransitionSource(id: record.barcode, in: zoom)
+                        NavigationLink(value: record.barcode) { RecentCard(record: record) }
+                            .buttonStyle(.pressable)
+                            .matchedTransitionSource(id: record.barcode, in: zoom)
                     }
                 }
                 .scrollTargetLayout()
@@ -141,51 +174,91 @@ struct HomeView: View {
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
         }
+        .reveal()
     }
 
-    // MARK: Week
+    private var popular: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Popular in \(API.country)", detail: "what people are scanning")
+            ScrollView(.horizontal) {
+                HStack(spacing: 10) {
+                    ForEach(trending) { card in
+                        NavigationLink(value: card.barcode) { ProductCardTile(card: card) }
+                            .buttonStyle(.pressable)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+        }
+        .reveal()
+    }
+
+    // MARK: Trends
 
     private var days: [(date: Date, count: Int)] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
-        return (0..<7).reversed().map { offset in
+        return (0..<trendWindow).reversed().map { offset in
             let day = cal.date(byAdding: .day, value: -offset, to: today)!
             return (day, records.filter { cal.isDate($0.scannedAt, inSameDayAs: day) }.count)
         }
     }
 
+    private var windowRecords: [ScanRecord] {
+        let start = Calendar.current.date(byAdding: .day, value: -(trendWindow - 1), to: Calendar.current.startOfDay(for: .now))!
+        return records.filter { $0.scannedAt >= start }
+    }
+
     private var week: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Your week", detail: "\(thisWeek) look-ups")
+            HStack {
+                SectionHeader(title: "Your trends")
+                Picker("Window", selection: $trendWindow) {
+                    Text("7d").tag(7)
+                    Text("30d").tag(30)
+                    Text("90d").tag(90)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 150)
+                .disabled(!plus.isActive)
+            }
+            if !plus.isActive {
+                PlusGate(text: "30 and 90-day trends need Plus")
+            }
             Chart(days, id: \.date) { day in
                 BarMark(x: .value("Day", day.date, unit: .day), y: .value("Scans", day.count))
                     .foregroundStyle(day.count > 0 ? TL.accent : Color.white.opacity(0.1))
-                    .cornerRadius(4)
+                    .cornerRadius(3)
             }
             .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                AxisMarks(values: .stride(by: .day, count: trendWindow == 7 ? 1 : trendWindow / 6)) { _ in
+                    AxisValueLabel(format: trendWindow == 7 ? .dateTime.weekday(.narrow) : .dateTime.day(), centered: trendWindow == 7)
                         .foregroundStyle(TL.fg3)
                 }
             }
             .chartYAxis(.hidden)
             .frame(height: 96)
+            .animation(.tl(0.4), value: trendWindow)
 
             if let sugar = average(\.sugarGrams) {
-                gauge("Avg. sugar per scan", sugar, of: 50, unit: "g", color: TL.warn)
+                gauge("Avg. sugar per product", sugar, of: 50, unit: "g", color: TL.warn)
             }
             if let sodium = average(\.sodiumMg) {
-                gauge("Avg. sodium per scan", sodium, of: 2000, unit: "mg", color: TL.danger)
+                gauge("Avg. sodium per product", sodium, of: 2000, unit: "mg", color: TL.danger)
             }
-            Text("Per-100g averages against WHO free-sugar (50 g/day) and ICMR sodium (2,000 mg/day) guidelines.")
+            Text("Per-100 g averages of the last \(trendWindow) days against WHO free-sugar (50 g/day) and ICMR sodium (2,000 mg/day) guidelines.")
                 .font(.caption2)
                 .foregroundStyle(TL.fg3)
         }
         .card()
+        .reveal()
     }
 
     private func average(_ key: KeyPath<ScanRecord, Double?>) -> Double? {
-        let values = records.compactMap { $0[keyPath: key] }
+        let values = windowRecords.compactMap { $0[keyPath: key] }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
     }
@@ -209,43 +282,29 @@ struct HomeView: View {
     @ViewBuilder
     private var verifyNudge: some View {
         if let queueCount, queueCount > 0 {
-            Button { router.tab = .verify } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.title3)
-                        .foregroundStyle(TL.accent)
-                        .frame(width: 44, height: 44)
-                        .background(TL.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(queueCount) labels need a second pair of eyes")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Takes seconds. Keeps the data honest.")
-                            .font(.footnote)
-                            .foregroundStyle(TL.fg2)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
-                }
-                .card(radius: 20, padding: 14)
-            }
-            .buttonStyle(.pressable)
+            nudge(icon: "checkmark.seal.fill", tint: TL.accent,
+                  title: "\(queueCount) labels need a second pair of eyes",
+                  body: "Takes seconds. Keeps the data honest.") { router.tab = .verify }
         }
     }
 
     private var preferencesNudge: some View {
-        Button { router.tab = .you } label: {
+        nudge(icon: "slider.horizontal.3", tint: TL.info,
+              title: "Tell us what to watch for",
+              body: "Allergies, sugar, palm oil — flagged first on every scan.") { router.tab = .you }
+    }
+
+    private func nudge(icon: String, tint: Color, title: String, body: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 14) {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: icon)
                     .font(.title3)
-                    .foregroundStyle(TL.info)
+                    .foregroundStyle(tint)
                     .frame(width: 44, height: 44)
-                    .background(TL.info.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Tell us what to watch for")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Allergies, sugar, palm oil — flagged first on every scan.")
-                        .font(.footnote)
-                        .foregroundStyle(TL.fg2)
+                    Text(title).font(.subheadline.weight(.semibold))
+                    Text(body).font(.footnote).foregroundStyle(TL.fg2)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
@@ -253,6 +312,7 @@ struct HomeView: View {
             .card(radius: 20, padding: 14)
         }
         .buttonStyle(.pressable)
+        .reveal()
     }
 }
 
@@ -262,21 +322,16 @@ struct RecentCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                ProductThumb(url: record.imageURL, size: 52, radius: 14)
+                ProductThumb(url: record.imageURL, size: 56, radius: 16)
                 Spacer()
-                if let grade = record.nutriscoreGrade {
-                    Text(grade.uppercased())
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(TL.ink)
-                        .frame(width: 26, height: 26)
-                        .background(TL.grade(grade), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+                if let grade = record.nutriscoreGrade { GradeBadge(grade: grade) }
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(record.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                    .frame(minHeight: 36, alignment: .top)
                 Text(record.brand.isEmpty ? record.scannedAt.formatted(.relative(presentation: .named)) : record.brand)
                     .font(.caption)
                     .foregroundStyle(TL.fg3)
@@ -284,7 +339,7 @@ struct RecentCard: View {
             }
         }
         .frame(width: 150, alignment: .leading)
-        .card(radius: 20, padding: 14)
+        .card(radius: 22, padding: 14)
     }
 }
 

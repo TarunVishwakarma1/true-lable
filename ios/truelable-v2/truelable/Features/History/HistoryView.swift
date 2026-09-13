@@ -20,6 +20,8 @@ struct HistoryView: View {
     @State private var selected: Set<String> = []
     @State private var comparing: [ScanRecord] = []
     @Namespace private var zoom
+    private let plus = Plus.shared
+    private var compareLimit: Int { plus.isActive ? 4 : Plus.freeCompareLimit }
 
     private enum Filter: String, CaseIterable, Identifiable {
         case all = "All", verified = "Verified", good = "Nutri-Score A–B", poor = "Nutri-Score D–E"
@@ -87,23 +89,43 @@ struct HistoryView: View {
         }
     }
 
+    /// "Today / Yesterday / This week / Earlier" buckets.
+    private var grouped: [(title: String, records: [ScanRecord])] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+        let weekAgo = cal.date(byAdding: .day, value: -7, to: today)!
+        var buckets: [(String, [ScanRecord])] = [("Today", []), ("Yesterday", []), ("This week", []), ("Earlier", [])]
+        for r in visible {
+            let i = r.scannedAt >= today ? 0 : r.scannedAt >= yesterday ? 1 : r.scannedAt >= weekAgo ? 2 : 3
+            buckets[i].1.append(r)
+        }
+        return buckets.filter { !$0.1.isEmpty }
+    }
+
     private var list: some View {
         List {
             if visible.isEmpty {
                 ContentUnavailableView.search(text: query)
                     .listRowBackground(Color.clear)
             }
-            ForEach(visible) { record in
-                row(record)
-                    .listRowBackground(TL.bg)
-                    .listRowSeparatorTint(TL.line)
-                    .swipeActions(edge: .trailing) {
-                        if !compareMode {
-                            Button(role: .destructive) {
-                                context.delete(record)
-                            } label: { Label("Delete", systemImage: "trash") }
-                        }
+            ForEach(grouped, id: \.title) { group in
+                Section {
+                    ForEach(group.records) { record in
+                        row(record)
+                            .listRowBackground(TL.bg)
+                            .listRowSeparatorTint(TL.line)
+                            .swipeActions(edge: .trailing) {
+                                if !compareMode {
+                                    Button(role: .destructive) {
+                                        context.delete(record)
+                                    } label: { Label("Delete", systemImage: "trash") }
+                                }
+                            }
                     }
+                } header: {
+                    Eyebrow(text: group.title)
+                }
             }
         }
         .listStyle(.plain)
@@ -129,7 +151,7 @@ struct HistoryView: View {
                     .font(.title3)
                     .foregroundStyle(selected.contains(record.barcode) ? TL.accent : TL.fg3)
             }
-            ProductThumb(url: record.imageURL, size: 52, radius: 14)
+            ProductThumb(url: record.imageURL, size: 56, radius: 16)
             VStack(alignment: .leading, spacing: 3) {
                 Text(record.name)
                     .font(.subheadline.weight(.semibold))
@@ -146,13 +168,7 @@ struct HistoryView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                if let grade = record.nutriscoreGrade {
-                    Text(grade.uppercased())
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(TL.ink)
-                        .frame(width: 26, height: 26)
-                        .background(TL.grade(grade), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+                if let grade = record.nutriscoreGrade { GradeBadge(grade: grade) }
                 if record.verified {
                     Image(systemName: "checkmark.seal.fill").font(.caption).foregroundStyle(TL.accent)
                 }
@@ -163,17 +179,23 @@ struct HistoryView: View {
     }
 
     private var compareBar: some View {
-        Button {
-            comparing = records.filter { selected.contains($0.barcode) }
-        } label: {
-            Text(selected.count < 2 ? "Pick 2–4 products" : "Compare \(selected.count) products")
+        VStack(spacing: 10) {
+            if !plus.isActive && selected.count >= compareLimit {
+                PlusGate(text: "Compare up to four with Plus")
+            }
+            Button {
+                comparing = records.filter { selected.contains($0.barcode) }
+            } label: {
+                Text(selected.count < 2 ? "Pick 2–\(compareLimit) products" : "Compare \(selected.count) products")
+            }
+            .buttonStyle(.primary)
+            .disabled(selected.count < 2)
+            .opacity(selected.count < 2 ? 0.6 : 1)
         }
-        .buttonStyle(.primary)
-        .disabled(selected.count < 2)
-        .opacity(selected.count < 2 ? 0.6 : 1)
         .padding(.horizontal, TL.gutter)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
+        .animation(.tl(0.3), value: selected.count)
     }
 
     private var empty: some View {
@@ -191,7 +213,7 @@ struct HistoryView: View {
 
     private func toggle(_ barcode: String) {
         withAnimation(.tl(0.25)) {
-            if selected.contains(barcode) { selected.remove(barcode) } else if selected.count < 4 { selected.insert(barcode) }
+            if selected.contains(barcode) { selected.remove(barcode) } else if selected.count < compareLimit { selected.insert(barcode) }
         }
     }
 }

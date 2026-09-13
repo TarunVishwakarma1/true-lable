@@ -27,8 +27,8 @@ struct NotFoundScreen: View {
                     .foregroundStyle(TL.warn)
             }
             Text("Not in the catalogue yet")
-                .font(.title2.weight(.bold))
-            Text("You can be the first. Photograph the ingredient list and we'll read it on your phone — takes about ten seconds.")
+                .font(.display(30))
+            Text("You can be the first. Point the camera at the pack — front, ingredients, nutrition — and it's read live on your phone.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
                 .multilineTextAlignment(.center)

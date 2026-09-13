@@ -301,157 +301,285 @@ sequenceDiagram
 
 ## 🗄️ Database Schema
 
+Migrations run automatically at boot (`db::run_migrations`), in
+`backend/migrations/`. This is the schema they actually produce.
+
 ```markdown
-┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
-│              products                 │       │             verifications             │
-├───────────────────────────────────────┤       ├───────────────────────────────────────┤
-│ id: UUID (PK)                         │◀──┐   │ id: UUID (PK)                         │
-│ barcode: VARCHAR(50) [UNIQUE, INDEX]  │   └───│ product_id: UUID (FK)                 │
-│ country: VARCHAR(2) [INDEX]           │       │ barcode: VARCHAR(50) [INDEX]          │
-│ product_name: TEXT                    │       │ user_id: VARCHAR(100) (Device UUID)   │
-│ brand: TEXT [INDEX]                   │       │ country: VARCHAR(2)                   │
-│ image_url: TEXT                       │       │ verified: BOOLEAN                     │
-│ nutrition_facts: JSONB                │       │ created_at: TIMESTAMP                 │
-│ ingredients: TEXT                     │       │ metadata: JSONB                       │
-│ allergens: TEXT                       │       └───────────────────────────────────────┘
-│ source: VARCHAR(30)                   │
-│ verification_count: INT DEFAULT 0     │       ┌───────────────────────────────────────┐
-│ verified: BOOLEAN DEFAULT FALSE       │       │            ocr_submissions            │
-│ verified_at: TIMESTAMP (NULLABLE)     │       ├───────────────────────────────────────┤
-│ confidence_score: FLOAT               │       │ id: UUID (PK)                         │
-│ created_at: TIMESTAMP                 │       │ barcode: VARCHAR(50) [INDEX]          │
-│ updated_at: TIMESTAMP                 │       │ image_url: TEXT                       │
-└───────────────────────────────────────┘       │ extracted_text: TEXT                  │
-                   ▲                            │ parsed_nutrition: JSONB               │
-                   │                            │ confidence_score: FLOAT               │
-                   │                            │ status: VARCHAR(30)                   │
-                   │                            │ reason_discarded: TEXT                │
-                   │                            │ created_at: TIMESTAMP                 │
-                   └────────────────────────────│ final_product_id: UUID (FK, NULLABLE) │
-                                                └───────────────────────────────────────┘
+┌────────────────────────────────────────────┐      ┌──────────────────────────────────────┐
+│                  products                  │      │            verifications             │
+├────────────────────────────────────────────┤      ├──────────────────────────────────────┤
+│ id                UUID PK                  │◀──┐  │ id           UUID PK                 │
+│ barcode           VARCHAR(20) UNIQUE       │   └──│ product_id   UUID FK → products(id)  │
+│ country           VARCHAR(2)               │      │ barcode      VARCHAR(20)             │
+│ product_name      VARCHAR(255)             │      │ country      VARCHAR(2)              │
+│ brand             VARCHAR(255)             │      │ device_id    VARCHAR(255)            │
+│ image_url         TEXT                     │      │ verified     BOOLEAN NOT NULL        │
+│ nutrition_facts   JSONB NOT NULL           │      │ created_at   TIMESTAMPTZ             │
+│ ingredients       TEXT                     │      └──────────────────────────────────────┘
+│ allergens         TEXT                     │
+│ source            VARCHAR(50)              │      ┌──────────────────────────────────────┐
+│ verified          BOOLEAN  DEFAULT FALSE   │      │           ocr_submissions            │
+│ verification_count INT     DEFAULT 0       │      ├──────────────────────────────────────┤
+│ confidence_score  FLOAT                    │      │ id               UUID PK             │
+│ additives         JSONB                    │      │ barcode          VARCHAR(20)         │
+│ nova_group        SMALLINT                 │      │ country          VARCHAR(2)          │
+│ nutriscore_grade  VARCHAR(1)               │      │ image_url        TEXT (nullable)     │
+│ is_vegan          BOOLEAN (tri-state)      │      │ extracted_text   TEXT NOT NULL       │
+│ is_vegetarian     BOOLEAN (tri-state)      │      │ parsed_nutrition JSONB               │
+│ is_palm_oil_free  BOOLEAN (tri-state)      │      │ confidence_score FLOAT               │
+│ category          TEXT                     │      │ status           VARCHAR(50)         │
+│ lookup_count      INT NOT NULL DEFAULT 0   │      │ created_at       TIMESTAMPTZ         │
+│ created_at        TIMESTAMPTZ              │      │ updated_at       TIMESTAMPTZ         │
+│ updated_at        TIMESTAMPTZ              │◀─────│ final_product_id UUID FK (nullable)  │
+└────────────────────────────────────────────┘      └──────────────────────────────────────┘
 ```
 
-### Table Indices
+Notes that matter when querying:
 
-- **`products`**:
-  - `CREATE UNIQUE INDEX idx_products_barcode ON products(barcode);`
-  - `CREATE INDEX idx_products_country_barcode ON products(country, barcode);`
-  - `CREATE INDEX idx_products_verified ON products(verified);`
-  - `CREATE INDEX idx_products_created_at ON products(created_at DESC);`
-- **`verifications`**:
-  - `CREATE INDEX idx_verifications_product_created ON verifications(product_id, created_at);`
-  - `CREATE INDEX idx_verifications_barcode_country ON verifications(barcode, country);`
-- **`ocr_submissions`**:
-  - `CREATE INDEX idx_ocr_barcode ON ocr_submissions(barcode);`
-  - `CREATE INDEX idx_ocr_status ON ocr_submissions(status);`
-  - `CREATE INDEX idx_ocr_confidence ON ocr_submissions(confidence_score DESC);`
+- **`nutrition_facts`** always carries the same thirteen keys — `energy_kcal`,
+  `protein`, `carbs`, `fat`, `saturated_fat`, `trans_fat`, `fiber`, `sugar`,
+  `sodium`, `cholesterol`, `potassium`, `calcium`, `iron` — per 100 g, with
+  `sodium` in grams. Values may be `null`; a user-contributed product with no
+  nutrition table stores `{}`.
+- **`additives`** is a JSON array of E-numbers (`["E150D","E338"]`). `NULL`
+  means "the source has no additive data", which is not the same claim as
+  "no additives".
+- **`is_vegan` / `is_vegetarian` / `is_palm_oil_free`** are genuinely
+  three-valued. `NULL` is "unknown" and must never be collapsed to `false`.
+- **`category`** is Open Food Facts' most specific `categories_tags` entry
+  (`"fruit-nectars"`). It is what same-shelf alternatives match on; rows
+  without one are excluded from that feature rather than matched loosely.
+- **`lookup_count`** increments on every resolved look-up, asynchronously so
+  it never sits on the scan path. It ranks `/products/trending` and breaks
+  ties in search.
+
+### Indices
+
+```sql
+-- products
+CREATE INDEX idx_products_barcode            ON products(barcode);
+CREATE INDEX idx_products_barcode_country    ON products(barcode, country);
+CREATE INDEX idx_products_verified           ON products(verified);
+CREATE INDEX idx_products_category_country   ON products(category, country);
+CREATE INDEX idx_products_country_popularity ON products(country, lookup_count DESC);
+CREATE INDEX idx_products_name_trgm          ON products USING gin (product_name gin_trgm_ops);
+CREATE INDEX idx_products_brand_trgm         ON products USING gin (brand gin_trgm_ops);
+
+-- verifications
+CREATE INDEX idx_verifications_product_id       ON verifications(product_id);
+CREATE INDEX idx_verifications_barcode_country  ON verifications(barcode, country);
+
+-- ocr_submissions
+CREATE INDEX idx_ocr_submissions_barcode ON ocr_submissions(barcode);
+CREATE INDEX idx_ocr_submissions_status  ON ocr_submissions(status);
+```
+
+The two GIN indices need the `pg_trgm` extension, which the search migration
+creates (`CREATE EXTENSION IF NOT EXISTS pg_trgm`). On a managed Postgres the
+role running migrations must be allowed to create extensions; every major
+provider ships `pg_trgm` on its allowed list.
 
 ---
 
 ## 📡 API Contract
 
-### 1. Search Product by Barcode
+Every response is wrapped in the same envelope:
 
-- **Endpoint**: `GET /api/v1/products/search`
-- **Query Parameters**:
-  - `barcode`: `string` (required)
-  - `country`: `string` (default: `"IN"`)
+```json
+{ "status": "success", "data": { }, "cached": false, "timestamp": "2026-09-13T10:00:00Z" }
+```
 
-#### Response (`200 OK` - Found)
+Errors reply `{ "status": "error", "error": "...", "timestamp": "..." }` with a
+`400` (bad barcode/country/query), `404` (product not in the catalogue),
+`502` (Open Food Facts unreachable) or `500`.
+
+`country` is a 2-letter code everywhere and defaults to `IN`.
+
+---
+
+### 1. Look up a product by barcode
+
+`GET /api/v1/products/search?barcode=<8–14 digits>&country=IN`
+
+Resolution order is Redis (5 min TTL) → Postgres → Open Food Facts (rate
+limited to 12 req/min across the whole service). A product fetched from Open
+Food Facts is written to Postgres before it is returned, so the second
+look-up is local. Each resolved look-up increments `products.lookup_count`,
+which is what `/trending` ranks on.
 
 ```json
 {
-  "status": "found",
+  "status": "success",
+  "cached": false,
   "data": {
-    "barcode": "8901030825415",
-    "product_name": "Classic Salted Potato Chips",
-    "brand": "Lays",
+    "id": "b18b6250-9d04-4cc4-9c09-a1b9ceec848a",
+    "barcode": "8901030895564",
+    "country": "IN",
+    "product_name": "Aloo Bhujia",
+    "brand": "Haldiram's",
+    "image_url": "https://images.openfoodfacts.org/…/front.jpg",
     "nutrition_facts": {
-      "energy_kcal": 540,
-      "protein_g": 6.8,
-      "carbohydrates_g": 52.5,
-      "fat_g": 33.7,
-      "sodium_mg": 520
+      "energy_kcal": 546, "protein": 9.2, "carbs": 43.8, "fat": 36.4,
+      "saturated_fat": 12.1, "trans_fat": 0, "fiber": 3,
+      "sugar": 2.4, "sodium": 1.18, "cholesterol": null,
+      "potassium": null, "calcium": null, "iron": null
     },
+    "ingredients": "Gram flour, edible vegetable oil (palm), potato, salt…",
+    "allergens": "en:peanuts",
     "source": "open_food_facts",
-    "verified": true,
-    "verification_count": 4,
-    "confidence_score": 0.95,
-    "cached": true
+    "verified": false,
+    "verification_count": 1,
+    "additives": ["E330", "E500II"],
+    "nova_group": 4,
+    "nutriscore_grade": "d",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_palm_oil_free": false,
+    "category": "namkeen"
   }
 }
 ```
 
-#### Response (`404 Not Found`)
-
-```json
-{
-  "status": "not_found",
-  "message": "Product not found in Open Food Facts or crowdsourced database."
-}
-```
+Every nutrient is **per 100 g**, and `sodium` is in **grams** (Open Food Facts'
+convention), not milligrams. The three dietary flags are deliberately
+tri-state: `null` means the source has no definitive answer, never "no".
 
 ---
 
-### 2. Submit Label Photo (OCR Extraction)
+### 2. Search products by name or brand
 
-- **Endpoint**: `POST /api/v1/products/submit_label`
-- **Request Body**:
+`GET /api/v1/products/query?q=<2–60 chars>&country=IN&limit=20`
 
-```json
-{
-  "barcode": "8901030825415",
-  "country": "IN",
-  "image": "<base64_encoded_jpeg>",
-  "user_device_id": "9B1D6F20-80E2-47DB-9D9B-FDF6ECFA8B85"
-}
-```
+Local catalogue first, ranked by trigram similarity against `product_name`
+and `brand` then by popularity. When fewer than five local rows match, the
+list is topped up from Open Food Facts' search endpoint, which runs on its
+own 8 req/min budget and is **skipped rather than queued** when that budget is
+spent — a thin result beats a slow one. Results are cached for 10 minutes.
 
-#### Response (`200 OK`)
+Returns an array of product cards:
 
 ```json
 {
-  "ocr_submission_id": "b18b6250-9d04-4cc4-9c09-a1b9ceec848a",
-  "extracted_data": {
-    "product_name": "Classic Salted Potato Chips",
-    "brand": "Lays",
-    "nutrition_facts": {
-      "energy_kcal": 540,
-      "protein_g": 6.8,
-      "fat_g": 33.7
+  "status": "success",
+  "cached": false,
+  "data": [
+    {
+      "barcode": "8901030895564",
+      "product_name": "Aloo Bhujia",
+      "brand": "Haldiram's",
+      "image_url": "https://…/front.jpg",
+      "nutriscore_grade": "d",
+      "nova_group": 4,
+      "verified": false,
+      "energy_kcal": 546,
+      "sugar": 2.4,
+      "sodium": 1.18
     }
-  },
-  "confidence_score": 0.92,
-  "needs_user_confirmation": true
+  ]
 }
 ```
 
 ---
 
-### 3. Verify Product Data
+### 3. Trending products
 
-- **Endpoint**: `POST /api/v1/products/verify`
-- **Request Body**:
+`GET /api/v1/products/trending?country=IN&limit=10`
+
+The same card shape, ordered by `lookup_count`, then verification count, then
+recency — so a freshly seeded database still returns something rather than an
+empty list. Products still named `Unknown` are excluded.
+
+---
+
+### 4. Same-shelf alternatives
+
+`GET /api/v1/products/alternatives?barcode=…&country=IN&sort_by=sugar&limit=3`
+
+Products sharing the scanned product's `category`, ranked on one nutrient.
+`sort_by` accepts `sugar`, `sodium`, `fat`, `saturated_fat`, `energy_kcal`,
+`carbs` (ascending — less is better), `protein`, `fiber` (descending — more is
+better), or `score` (Nutri-Score then NOVA). `limit` is clamped to 1–10.
+
+Returns product cards with an extra `sort_value` (the ranked nutrient's per-100 g
+figure). A product with no `category` returns `[]` — an unmatched shelf beats a
+wrong one.
+
+---
+
+### 5. Verification queue
+
+`GET /api/v1/products/needs-verification?country=IN&device_id=<uuid>&limit=12`
+
+Products below the 3-confirmation threshold that this device hasn't already
+voted on. Omitting `device_id` skips the exclusion rather than failing.
 
 ```json
 {
-  "barcode": "8901030825415",
+  "status": "success",
+  "data": [
+    {
+      "barcode": "8901030895564",
+      "product_name": "Aloo Bhujia",
+      "brand": "Haldiram's",
+      "image_url": "https://…/front.jpg",
+      "nutriscore_grade": "d",
+      "energy_kcal": 546,
+      "sugar": 2.4,
+      "sodium": 1.18,
+      "verification_count": 1
+    }
+  ]
+}
+```
+
+---
+
+### 6. Confirm a product matches its label
+
+`POST /api/v1/products/verify`
+
+```json
+{ "barcode": "8901030895564", "country": "IN", "device_id": "9B1D6F20-…" }
+```
+
+Records a row in `verifications`, increments `products.verification_count`,
+flips `verified` to true at 3, busts the product's cache entry, and returns the
+refreshed product in the standard envelope.
+
+---
+
+### 7. Submit a label read on-device
+
+`POST /api/v1/ocr/submit`
+
+The client runs OCR itself (Vision framework, live multi-frame) and sends the
+untouched recognized text alongside what the user confirmed after reviewing it.
+
+```json
+{
+  "barcode": "8901030895564",
   "country": "IN",
-  "confirmed": true,
-  "user_device_id": "9B1D6F20-80E2-47DB-9D9B-FDF6ECFA8B85",
-  "product_id": "b18b6250-9d04-4cc4-9c09-a1b9ceec848a"
+  "extracted_text": "HALDIRAM'S\nAloo Bhujia\nIngredients: Gram flour…",
+  "reviewed_ingredients": "Gram flour, Palm oil, Salt",
+  "reviewed_allergens": ["Peanut"],
+  "product_name": "Aloo Bhujia",
+  "brand": "Haldiram's",
+  "nutrition": { "energy_kcal": 546, "fat": 36.4, "sugar": 2.4, "sodium": 1.18 }
 }
 ```
 
-#### Response (`200 OK`)
+`product_name`, `brand` and `nutrition` are optional — older clients send only
+the ingredient side. `extracted_text` is kept as the audit trail: the server
+re-parses it and compares against the reviewed fields, so a submission that
+silently drops an allergen OCR clearly found is stored
+`flagged_allergen_mismatch`, and one whose ingredients were wholesale replaced
+is stored `flagged_low_confidence`. `nutrition` is filtered to the thirteen
+known keys with finite values in `0…1000` before anything is written.
 
-```json
-{
-  "status": "verified",
-  "verification_count": 3,
-  "product_now_verified": true
-}
-```
+A successful submission also inserts the product itself (`source:
+"user_contributed"`, `verified: false`) with `ON CONFLICT (barcode) DO NOTHING`,
+so the barcode is searchable immediately without unverified data ever
+clobbering an existing row.
 
 ---
 

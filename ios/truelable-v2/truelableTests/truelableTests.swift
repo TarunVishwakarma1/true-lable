@@ -117,3 +117,52 @@ struct OCRHeuristicTests {
         #expect(LabelOCR.guessName(raw) == "Nutella")
     }
 }
+
+struct NutritionParserTests {
+    @Test func readsTypicalIndianLabel() {
+        let text = """
+        Nutritional Information (per 100 g)
+        Energy 2285 kJ / 546 kcal
+        Total Fat 36.4 g
+        Saturated Fat 12.1 g
+        Trans Fat 0 g
+        Carbohydrate 43.8 g
+        Sugars
+        2.4 g
+        Protein 9.2 g
+        Salt 1.2 g
+        """
+        let n = NutritionParser.parse(text)
+        #expect(n.energyKcal == 546)
+        #expect(n.fat == 36.4)
+        #expect(n.saturatedFat == 12.1)
+        #expect(n.transFat == 0)
+        #expect(n.carbs == 43.8)
+        #expect(n.sugar == 2.4)          // label and value on separate lines
+        #expect(n.protein == 9.2)
+        #expect(n.sodium == 0.48)        // salt 1.2 g → sodium 0.48 g
+    }
+
+    @Test func convertsKJOnlyEnergyAndMgSodium() {
+        let n = NutritionParser.parse("Energy 1000 kJ\nSodium 480 mg")
+        #expect(n.energyKcal == 239)
+        #expect(n.sodium == 0.48)
+    }
+}
+
+struct OCRDraftTests {
+    @Test func brandIsTallestFrontLineAndWeightsAreSkipped() {
+        let front = TextTake(lines: [
+            TextLine(text: "200 g", height: 30, y: 0.9),
+            TextLine(text: "HALDIRAM'S", height: 60, y: 0.2),
+            TextLine(text: "Aloo Bhujia", height: 40, y: 0.5),
+            TextLine(text: "Crispy & tasty, the original recipe since 1937 by the family", height: 12, y: 0.7)
+        ])
+        let ingredients = TextTake(lines: [TextLine(text: "Ingredients: Gram flour, Palm oil, Salt.", height: 10, y: 0.5)])
+        let d = LabelOCR.draft(front: front, ingredients: ingredients, nutrition: nil)
+        #expect(d.brand == "HALDIRAM'S")
+        #expect(d.name == "Aloo Bhujia")
+        #expect(d.nameCandidates == ["HALDIRAM'S", "Aloo Bhujia"])
+        #expect(d.ingredients == "Gram flour, Palm oil, Salt")
+    }
+}

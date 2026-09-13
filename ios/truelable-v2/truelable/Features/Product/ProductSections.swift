@@ -338,51 +338,75 @@ struct AllergensCard: View {
 
 // MARK: - Alternatives
 
+/// Same-shelf swaps. Free: the top three on the nutrient you watch. Plus:
+/// pick the nutrient and see the full ranked list.
 struct AlternativesCard: View {
     let product: Product
     let prefs: Set<DietaryPreference>
 
-    @State private var alternatives: [Alternative] = []
+    @State private var alternatives: [ProductCard] = []
+    @State private var sortKey: String = "sugar"
+    @State private var loaded = false
+    private let plus = Plus.shared
 
-    private var sortKey: String { prefs.contains(.lowSodium) && !prefs.contains(.lowSugar) ? "sodium" : "sugar" }
-    private var unit: String { sortKey == "sodium" ? "g sodium" : "g sugar" }
+    private static let sorts: [(key: String, label: String, unit: String)] = [
+        ("sugar", "Sugar", "g sugar"), ("sodium", "Sodium", "g sodium"), ("fat", "Fat", "g fat"),
+        ("saturated_fat", "Sat. fat", "g sat. fat"), ("energy_kcal", "Calories", "kcal"),
+        ("protein", "Protein", "g protein"), ("score", "Overall grade", "")
+    ]
+
+    private var unit: String { Self.sorts.first { $0.key == sortKey }?.unit ?? "" }
+    private var title: String {
+        sortKey == "score" ? "Better graded, same shelf" : (sortKey == "protein" ? "More protein, same shelf" : "Lower \(Self.sorts.first { $0.key == sortKey }?.label.lowercased() ?? sortKey), same shelf")
+    }
 
     var body: some View {
         if !alternatives.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Lower \(sortKey), same shelf", detail: product.category?.replacingOccurrences(of: "-", with: " ").capitalized)
+                HStack {
+                    SectionHeader(title: title, detail: product.category?.replacingOccurrences(of: "-", with: " ").capitalized)
+                    if plus.isActive {
+                        Menu {
+                            Picker("Rank by", selection: $sortKey) {
+                                ForEach(Self.sorts, id: \.key) { Text($0.label).tag($0.key) }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(TL.accent)
+                        }
+                    }
+                }
                 VStack(spacing: 0) {
                     ForEach(Array(alternatives.enumerated()), id: \.element.id) { i, alt in
                         if i > 0 { Divider().overlay(TL.line) }
                         NavigationLink(value: alt.barcode) {
-                            HStack(spacing: 12) {
-                                Text(alt.productName)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                Spacer()
-                                if let v = alt.sortValue {
-                                    Text("\(v.compact) \(unit)")
-                                        .font(.caption.weight(.semibold))
-                                        .monospacedDigit()
-                                        .foregroundStyle(TL.accent)
-                                }
-                                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
-                            }
-                            .padding(.vertical, 10)
-                            .contentShape(Rectangle())
+                            ProductCardRow(card: alt, trailing: alt.sortValue.map { "\($0.compact) \(unit)" })
+                                .padding(.vertical, 10)
                         }
                         .buttonStyle(.pressable)
                     }
                 }
+                if !plus.isActive {
+                    PlusGate(text: "Rank by any nutrient · see the full shelf")
+                }
             }
             .card()
+            .reveal()
             .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
         // Rendered even when empty so the task still runs.
         Color.clear.frame(height: 0)
-            .task(id: product.barcode) {
-                let found = (try? await API.alternatives(barcode: product.barcode, sortBy: sortKey)) ?? []
+            .task(id: "\(product.barcode)|\(sortKey)|\(plus.isActive)") {
+                if !loaded {
+                    sortKey = prefs.contains(.lowSodium) && !prefs.contains(.lowSugar) ? "sodium"
+                        : prefs.contains(.highProtein) && !prefs.contains(.lowSugar) ? "protein" : "sugar"
+                    loaded = true
+                }
+                let found = (try? await API.alternatives(
+                    barcode: product.barcode, sortBy: sortKey,
+                    limit: plus.isActive ? 10 : Plus.freeAlternativesLimit
+                )) ?? []
                 withAnimation(.tl(0.4)) { alternatives = found }
             }
     }

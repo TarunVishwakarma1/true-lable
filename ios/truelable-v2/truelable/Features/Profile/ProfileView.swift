@@ -15,6 +15,8 @@ struct ProfileView: View {
     @AppStorage(Keys.verifiedCount) private var verifiedCount = 0
     @AppStorage(Keys.dietary) private var dietaryRaw = ""
     @State private var confirmClear = false
+    @State private var showingPlus = false
+    private let plus = Plus.shared
 
     private var prefs: Set<DietaryPreference> { DietaryPreference.decode(dietaryRaw) }
 
@@ -23,6 +25,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     stats
+                    plusCard
                     watchFor
                     about
                     data
@@ -41,6 +44,33 @@ struct ProfileView: View {
             }
         } message: {
             Text("This only removes the list on this phone. Community verifications you made stay counted.")
+        }
+    }
+
+    private var plusCard: some View {
+        Group {
+            if plus.isActive {
+                Button { showingPlus = true } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.title3)
+                            .foregroundStyle(TL.ink)
+                            .frame(width: 44, height: 44)
+                            .background(TL.accentGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("TrueLabel Plus is on").font(.subheadline.weight(.semibold))
+                            Text("Trends, four-way compare, ranked swaps. Tap to manage.").font(.footnote).foregroundStyle(TL.fg2)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
+                    }
+                    .card(radius: 20, fill: TL.elevated, padding: 14)
+                }
+                .buttonStyle(.pressable)
+                .sheet(isPresented: $showingPlus) { PlusView() }
+            } else {
+                PlusBanner()
+            }
         }
     }
 
