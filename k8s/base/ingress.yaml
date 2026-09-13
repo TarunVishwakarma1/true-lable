@@ -9,6 +9,31 @@ metadata:
   name: true-label
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # The app caps bodies at 256 KB; reject anything larger at the edge so it
+    # never reaches a worker.
+    nginx.ingress.kubernetes.io/proxy-body-size: "256k"
+
+    # Slow-loris defence: a client that cannot send or read at a reasonable
+    # pace is dropped rather than allowed to hold a connection.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/client-body-timeout: "10"
+    nginx.ingress.kubernetes.io/client-header-timeout: "10"
+
+    # A first line of volumetric defence. The application limits per device
+    # and per address as well, but that costs a Redis round trip; this costs
+    # nothing and never reaches the app. Genuine volumetric DDoS still has to
+    # be absorbed upstream of the cluster — a CDN or scrubbing provider — no
+    # amount of application code substitutes for that.
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+
+    # Once this ingress is applied, set TRUSTED_PROXY_HOPS in
+    # backend-config to the number of proxies appending to X-Forwarded-For.
+    # With this ingress and nothing else in front, that is 1.
 spec:
   ingressClassName: nginx
   tls:

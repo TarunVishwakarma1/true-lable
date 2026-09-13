@@ -432,6 +432,33 @@ behind the token is gone; the client registers afresh and retries once.
 | `/products/needs-verification` | optional — a token lets it skip what you already voted on |
 | `/products/verify`, `/ocr/submit`, all of `/me/*` | **required** |
 
+### Transport and browser posture
+
+Every response carries `Cache-Control: no-store`, `X-Content-Type-Options`,
+`X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'`,
+`Referrer-Policy: no-referrer` and HSTS. These are set on the router, not per
+route, so an endpoint added tomorrow is covered without anyone remembering.
+`no-store` is the one that matters most: an authenticated reply carries a
+profile and a subscription state, and without it a shared proxy may keep a
+copy and hand it to the next person through.
+
+**CORS is closed by default.** `ALLOWED_ORIGINS` is an explicit allowlist and
+starts empty. A native client sends no `Origin`, so an empty list costs the
+app nothing and stops the API being used as somebody else's free backend.
+Credentials are never allowed and never needed.
+
+**CSRF does not apply here, structurally rather than by mitigation.** This API
+authenticates with an `Authorization` header, which a browser never attaches
+on its own, and it sets no cookies. There is no ambient authority for a
+cross-site request to borrow. That property is worth protecting: the moment a
+cookie carries auth, every state-changing route needs a token of its own.
+
+**Requests time out at 25 seconds**, longer than any call this service makes
+outward, so a request can only expire here once its own dependencies already
+have. Calls to Open Food Facts carry their own 10-second ceiling. Without
+these a hung connection holds a worker and a database handle indefinitely,
+which is how a slow client takes a service down with no volume at all.
+
 ### Rate limits
 
 Per hour, counted in Redis. The subject is the **token** when there is one and
@@ -455,10 +482,38 @@ is unreachable the request is allowed and the failure is logged, because this
 limiter exists to blunt abuse and taking the API down when the cache blinks is
 the worse outcome.
 
-`X-Forwarded-For` is believed only when `TRUST_PROXY_HEADERS` is set, meaning
-a proxy that overwrites it sits in front. Otherwise the socket's peer address
-is used, since a caller could otherwise hand us a fresh address per request
-and lift its own limit.
+**`X-Forwarded-For` needs a hop count, not a boolean.** It is a list each
+proxy appends to, so everything left of what *your own* proxies added is
+written by the caller. Reading the leftmost entry — the obvious thing — means
+a client sends `X-Forwarded-For: <anything>` and picks a fresh rate-limit
+bucket on every request.
+
+`TRUSTED_PROXY_HOPS` is the number of proxies in front of this process, and
+the client is the entry that many places from the right: the address the
+outermost trusted proxy actually observed. It defaults to `0`, which ignores
+the header and uses the socket's peer address, which no caller can forge.
+
+Count only hops that append to the header. `ingress-nginx` alone is `1`; a CDN
+in front of it makes `2`; an L4 load balancer does not append and does not
+count. **Setting it higher than the truth is worse than leaving it at zero**,
+because the surplus entries are the caller's.
+
+A global backstop of 3,000 requests per hour per address covers every route,
+including ones added later, so a flood at an endpoint nobody remembered to
+protect still costs something. Health checks are exempt: limiting them would
+pull the service out of rotation under exactly the load the limit exists for.
+
+**On DDoS, plainly.** Application code cannot absorb a volumetric attack. What
+it can do is refuse to amplify, bound the work any one caller can cause, fail
+fast, and never exhaust its own resources — all of which is above. Absorbing
+volume is the edge's job: the ingress carries connection and request-rate
+caps and short client timeouts, and anything serious needs a CDN or scrubbing
+provider in front of the cluster.
+
+Postgres and Redis are closed to everything but the backend by NetworkPolicy.
+They hold every product row, profile and token hash, and neither speaks TLS
+inside the cluster, so a compromised sidecar reaching them directly is the
+failure worth preventing.
 
 Request bodies are capped at 256 KB, and an OCR submission at 20,000
 characters of recognised text.

@@ -9,3 +9,22 @@ data:
   MAX_DB_CONNECTIONS: "10"
   MAX_REDIS_CONNECTIONS: "10"
   RUST_LOG: "info"
+
+  # How many proxies sit in front of this process, and therefore how much of
+  # X-Forwarded-For was written by them rather than by the caller.
+  #
+  # MUST stay 0 until an ingress is actually in front. Everything to the left
+  # of what your own proxies appended is attacker-supplied, so a non-zero
+  # value with no proxy present hands every caller its own rate-limit bucket
+  # — worse than not reading the header at all.
+  #
+  # Count the hops that append to the header, outermost first:
+  #   ingress-nginx only ............... 1
+  #   CDN (Cloudflare etc.) + ingress .. 2
+  # An L4 / TCP load balancer does not append and does not count.
+  TRUSTED_PROXY_HOPS: "0"
+
+  # Browser origins permitted to call the API. The iOS client sends no
+  # Origin, so this stays empty until the web app has a real domain. Empty
+  # means no browser may call it, which is the safe default.
+  ALLOWED_ORIGINS: ""
