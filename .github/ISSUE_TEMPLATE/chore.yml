@@ -1,0 +1,22 @@
+name: 🧹 Chore
+description: Maintenance work — deps, CI, refactors, docs, cleanup. No user-facing behavior change.
+labels: ["chore"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is this?
+      options:
+        - Backend (Rust API)
+        - iOS app
+        - Web / Docs
+        - CI / deployment
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs doing, and why now?
+    validations:
+      required: true

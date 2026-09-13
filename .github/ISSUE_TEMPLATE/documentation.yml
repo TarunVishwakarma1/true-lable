@@ -1,0 +1,22 @@
+name: 📚 Documentation
+description: Something in the README, docs site, or code comments is missing, wrong, or unclear.
+labels: ["documentation"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where?
+      options:
+        - README
+        - Docs site (web/apps/docs)
+        - Code comments
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What's missing, wrong, or unclear?
+      description: Link the page or file if you can.
+    validations:
+      required: true

@@ -1,0 +1,41 @@
+---
+title: Introduction
+description: Developer documentation for the TrueLabel monorepo.
+---
+
+TrueLabel is an open-source barcode scanner with a crowdsourced,
+community-verified nutrition database. Scan a packaged product, see real
+nutrition facts, and help verify or add labels the catalogue doesn't have
+yet.
+
+This site documents the three things that make up the product, all in one
+monorepo:
+
+<Cards>
+  <Card title="Backend" href="/docs/backend">
+    Rust (Axum) API — product lookup, device auth, rate limiting, OCR
+    submission, profile/subscription.
+  </Card>
+  <Card title="iOS app" href="/docs/ios">
+    SwiftUI, iOS 26.5+. Scan, verify, history, and profile — talks to the
+    backend over a typed `APIClient`.
+  </Card>
+  <Card title="Web" href="/docs/web">
+    Turborepo (bun) — the marketing site and this docs site, sharing a
+    `@repo/ui` design-token package.
+  </Card>
+</Cards>
+
+## Where to start
+
+- New to the repo? [Getting Started](/docs/getting-started) gets all three
+  apps running locally.
+- Want the shape of the whole system first? [Architecture](/docs/architecture).
+- Building a client against the API? [API Reference](/docs/backend/api-reference/products).
+- Opening a PR? [Contributing](/docs/contributing).
+
+<Callout title="Accuracy over completeness">
+  Every page here is written against the code as it exists today, not a
+  plan or an aspiration. Where something is deliberately simplified or not
+  yet built, the page says so directly rather than describing it as done.
+</Callout>

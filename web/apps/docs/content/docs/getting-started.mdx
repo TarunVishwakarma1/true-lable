@@ -1,0 +1,119 @@
+---
+title: Getting Started
+description: Run the backend, iOS app, and web apps locally.
+---
+
+The three apps are independent — you don't need all of them running to work
+on one. Pick the tab(s) you need.
+
+<Tabs items={['Backend', 'iOS', 'Web']}>
+<Tab value="Backend">
+
+**Prerequisites**: Rust (stable, `rustup default stable`), Docker (or native
+Postgres 17 + Redis 7).
+
+<Steps>
+<Step>
+
+**Start Postgres and Redis.** From the repo root:
+
+```bash
+docker compose up -d postgres redis
+```
+
+</Step>
+<Step>
+
+**Configure environment.** From `backend/`:
+
+```bash
+cp .env.example .env
+```
+
+The defaults work with the compose services above as-is. See
+[Environment Variables](/docs/backend#environment-variables) for what each
+one does — `TRUSTED_PROXY_HOPS` and `ALLOWED_ORIGINS` matter once this runs
+behind a real reverse proxy, not for local dev.
+
+</Step>
+<Step>
+
+**Run it.** Migrations run automatically on boot — there's no separate
+migrate step for local dev.
+
+```bash
+cd backend
+cargo run
+```
+
+</Step>
+<Step>
+
+**Verify.**
+
+```bash
+curl http://localhost:8080/health/ready
+```
+
+</Step>
+</Steps>
+
+Run the test suite with `cargo test` from `backend/`.
+
+</Tab>
+<Tab value="iOS">
+
+**Prerequisites**: Xcode 26+, iOS 26.5 SDK.
+
+```bash
+cd ios/truelable
+open truelable.xcodeproj
+```
+
+Scheme: **`truelable`**. Point `APIEnvironment` at a running backend — by
+default it targets `http://localhost:8080` in debug builds; override with
+the `API_BASE_URL` environment variable on the scheme if you need something
+else (a LAN IP for a physical device, or the production API).
+
+<Callout type="warn" title="Don't launch the Simulator to verify a change">
+  Building for testing is enough to confirm code compiles and passes tests,
+  and is far faster than booting the Simulator. From `ios/truelable`:
+
+  ```bash
+  xcodebuild -scheme truelable -destination 'platform=iOS Simulator,name=<device>' build-for-testing
+  ```
+
+  Only actually launch the Simulator when you need to see or interact with
+  a UI change yourself.
+</Callout>
+
+</Tab>
+<Tab value="Web">
+
+**Prerequisites**: [bun](https://bun.sh) 1.3.8, Node 24+.
+
+```bash
+cd web
+bun install
+bun run dev
+```
+
+This starts every app in the Turborepo in parallel — the marketing site at
+`localhost:3000` (`apps/web`) and this docs site at `localhost:3001`
+(`apps/docs`). Run one app on its own with `bun run dev --filter=web` or
+`--filter=docs`.
+
+</Tab>
+</Tabs>
+
+## Repo layout at a glance
+
+```
+true-lable/
+├── backend/     Rust (Axum) API — see /docs/backend
+├── ios/         SwiftUI app — see /docs/ios
+├── web/         Turborepo (bun) — apps/web, apps/docs, packages/ui — see /docs/web
+├── deploy/      The real production deployment (nginx + systemd on a droplet)
+├── k8s/, infra/ Kubernetes/Terraform scaffolding — not the current deployment method, see /docs/deployment
+└── docker-compose.yml   Postgres + Redis for local backend dev
+```

@@ -1,50 +1,51 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tailwindcss";
+@import "fumadocs-ui/css/lib/default-colors.css";
+@import "fumadocs-ui/css/preset.css";
+@import "@repo/ui/styles.css";
+@source "../../../packages/ui/src";
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Map Fumadocs' own token names onto the same brand tokens the marketing
+   site uses (web/packages/ui/src/styles.css) — a docs site skinned with a
+   framework's default palette reads as bolted-on, not part of the product. */
+@theme inline {
+  --color-fd-background: var(--bg);
+  --color-fd-foreground: var(--fg);
+  --color-fd-primary: var(--accent);
+  --color-fd-primary-foreground: var(--ink);
+  --color-fd-border: var(--line);
+  --color-fd-ring: var(--accent);
+  --color-fd-accent: var(--surface);
+  --color-fd-accent-foreground: var(--fg);
+  --color-fd-muted: var(--surface);
+  --color-fd-muted-foreground: var(--muted);
+  --color-fd-secondary: var(--surface);
+  --color-fd-secondary-foreground: var(--fg);
+  --color-fd-card: var(--surface);
+  --color-fd-card-foreground: var(--fg);
+  --color-fd-popover: var(--surface);
+  --color-fd-popover-foreground: var(--fg);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  font-family: var(--font-sans);
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+/* Nav/sidebar/search chrome reads better in the monospace already used for
+   data throughout this product than the framework's default sans there. */
+[data-search-full] input,
+aside nav a,
+nav[aria-label="Sidebar"] {
+  font-feature-settings: "ss03";
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-
-  .imgLight {
-    display: none;
-  }
-  .imgDark {
-    display: unset;
-  }
+/* The site-wide a11y focus ring (packages/ui/src/styles.css) is redundant
+   here — the search dialog already shows its own focused state (border +
+   ESC hint) — and a 2px outline on a borderless input reads as a stray
+   green box. */
+input[placeholder="Search"] {
+  outline: none;
 }

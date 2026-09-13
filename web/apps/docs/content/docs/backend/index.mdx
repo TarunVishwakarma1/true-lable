@@ -1,0 +1,102 @@
+---
+title: Backend
+description: Rust (Axum) API — module layout, running locally, environment variables, testing.
+---
+
+## Module layout
+
+```
+backend/src/
+├── main.rs          Binary entry — tracing setup, signal handling
+├── lib.rs            build_app() — installs rustls, runs migrations on boot, wires AppState
+├── auth.rs           Device / MaybeDevice / ClientIp axum extractors
+├── config/
+│   └── env.rs         Env::load() — typed config, credential masking
+├── db/
+│   ├── postgres.rs     Pool setup, health checks
+│   └── redis.rs         Connection manager
+├── routes/
+│   ├── health.rs         /health, /health/live, /health/ready
+│   └── v1/
+│       ├── products.rs    search, query, trending, alternatives, needs-verification, verify
+│       ├── ocr.rs          submit
+│       └── me.rs           profile, stats, subscription, link/unlink, delete
+├── handlers/          One thin handler per route — extract, call a service, wrap in ApiResponse
+├── services/
+│   ├── product_service.rs   Product lookup/search/trending/alternatives/verify
+│   ├── ocr_service.rs        OCR submission parsing + confidence checks
+│   ├── user_service.rs        Profile, stats, subscription
+│   ├── apple_auth.rs           Sign in with Apple identity-token verification
+│   └── cache_service.rs        Redis rate-limit + cache helpers
+├── models/            DTOs and sqlx::FromRow structs
+├── middleware/        Structured logging, error handling
+└── utils/
+```
+
+Every response is wrapped the same way — `handlers/` never returns a raw
+body, always `ApiResponse<T>`:
+
+```json
+{ "status": "success", "data": { }, "cached": false, "timestamp": "2026-09-13T10:00:00Z" }
+```
+
+Errors: `{ "status": "error", "error": "...", "timestamp": "..." }` with a
+`400` (bad input), `401` (missing/invalid token), `404` (not in the
+catalogue), `429` (rate limited), `502` (Open Food Facts unreachable), or
+`500`.
+
+## Running locally
+
+```bash
+cd backend
+cp .env.example .env
+cargo run
+```
+
+Migrations run automatically on boot (`lib.rs` → `db::run_migrations`) —
+there's no separate `sqlx migrate run` step for local dev, though the
+migration files under `backend/migrations/` still exist for `sqlx-cli` or
+manual inspection.
+
+Needs Postgres 17 (with `pg_trgm`, created automatically by a migration if
+the connecting role can create extensions) and Redis 7 — `docker compose up
+-d postgres redis` from the repo root gets both.
+
+## Environment variables
+
+Read in `config/env.rs::Env::load()` — none of these fail startup if unset,
+they all fall back to a default:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/truelabel` | |
+| `REDIS_URL` | `redis://localhost:6379` | |
+| `SERVER_HOST` | `0.0.0.0` | Set to `127.0.0.1` in production — see [Deployment](/docs/deployment) |
+| `SERVER_PORT` | `8080` | |
+| `APP_ENV` | `development` | `development \| production \| docker \| test` |
+| `MAX_DB_CONNECTIONS` | `10` | |
+| `MAX_REDIS_CONNECTIONS` | `10` | |
+| `RUST_LOG` | `info` | |
+| `APPLE_BUNDLE_ID` | `com.tarun.truelable` | JWT audience for Sign in with Apple verification |
+| `TRUSTED_PROXY_HOPS` | `0` | **Security-critical** — see [Rate Limiting](/docs/backend/rate-limiting) |
+| `ALLOWED_ORIGINS` | *(empty)* | Comma-separated browser-origin allowlist; empty = no browser may call this API |
+
+One more, read directly via `std::env::var` rather than through `Env`
+(not in `.env.example`):
+
+| Variable | Default | Notes |
+|---|---|---|
+| `OFF_RATE_LIMIT_PER_MINUTE` | `12` | Outbound rate limit to Open Food Facts (`services/openfoodfacts.rs`) |
+
+## Testing
+
+Unit tests live inline (`#[cfg(test)] mod tests`) alongside the code they
+cover — notably thorough on `auth.rs`, `error.rs`, `config/env.rs`,
+`services/user_service.rs`, and `services/apple_auth.rs`. One integration
+test file exercises the full HTTP request lifecycle via
+`tower::ServiceExt::oneshot`.
+
+```bash
+cd backend
+cargo test
+```

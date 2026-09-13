@@ -1,0 +1,81 @@
+---
+title: Authentication
+description: Device bearer tokens — no accounts required.
+---
+
+There are no accounts in the traditional sense. A **device** is the
+subject, and it proves itself with a bearer token, not with its
+identifier.
+
+```
+POST /api/v1/auth/device        (no body, no auth)
+→ { "device_id": "…", "token": "…" }
+```
+
+The token is issued once per install and **returned exactly once** — it
+cannot be re-fetched. Only its SHA-256 is stored server-side
+(`users.token_hash`), so a database leak doesn't hand over credentials.
+Every per-user endpoint takes it as a bearer header:
+
+```
+Authorization: Bearer <token>
+```
+
+<Callout type="info" title="The device id never appears in a path or query">
+  It used to. That meant anyone holding one could read that person's
+  profile, cancel their Plus, or delete their account — a device
+  identifier is not a secret (iOS hands the same one to every app from a
+  vendor), and anything in a URL lands in proxy and access logs. The
+  token is the identity now, so a caller has no way to name anybody but
+  itself. The server, not the client, generates the id, so there's
+  nothing to guess or claim either.
+</Callout>
+
+On the client, the token lives in the **Keychain** (`kSecClassGenericPassword`,
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) — it survives deleting
+the app, which is what lets a reinstall keep its profile. A `401` means the
+row behind the token is gone; the iOS client's `DeviceAuth` actor registers
+afresh and retries once, single-flighted so concurrent callers don't
+double-register.
+
+## Which endpoints need a token
+
+| Endpoint | Auth |
+|---|---|
+| `/health*`, `/products/search`, `/query`, `/trending`, `/alternatives` | none |
+| `/products/needs-verification` | optional — a token lets it skip products you've already voted on |
+| `/products/verify`, `/ocr/submit`, all of `/me/*` | **required** |
+
+## Sign in with Apple
+
+Sign in with Apple is additive, never required — nothing in the app needs
+an account. It's the only identity provider (no passwords, no email
+delivery).
+
+`POST /api/v1/me/link` verifies the identity token end to end before
+writing anything: Apple's signature, over Apple's published key, issued by
+Apple, with this app's bundle id (`APPLE_BUNDLE_ID`) as audience, unexpired.
+Apple's keys are cached for six hours and re-fetched on an unknown key id.
+
+If that Apple identity already owns a row on another device, the account
+**moves** — Plus state and preferences come across, the old row is deleted,
+and that other phone reverts to anonymous. One active device per account;
+there's no cross-device sync, so anything else would silently duplicate an
+entitlement.
+
+`POST /api/v1/me/unlink` detaches the identity and keeps the row (what
+signing out should do — nothing is destroyed). `DELETE /api/v1/me/account`
+deletes the row for real, as the App Store requires for any app that
+creates accounts. Verifications the device submitted are left alone — they
+carry no identity beyond a device id, and removing them would silently
+unverify products other people rely on.
+
+<Callout type="warn" title="Needs a paid Apple Developer Program team">
+  A personal team can't create a provisioning profile that declares the
+  Sign in with Apple entitlement, so it fails outright rather than
+  degrading. The iOS build ships with the capability off
+  (`Capabilities.signInWithApple = false`, no `CODE_SIGN_ENTITLEMENTS` on
+  the target) and the account screen falls back to a display name the
+  person chooses via `PUT /me/profile`. The backend is live either way —
+  flipping the capability on is a client-only change.
+</Callout>

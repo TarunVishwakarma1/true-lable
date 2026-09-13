@@ -1,0 +1,36 @@
+name: ✨ Feature request
+description: Propose a new capability for the backend, iOS app, or web.
+labels: ["enhancement", "triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does this belong?
+      options:
+        - Backend (Rust API)
+        - iOS app
+        - Web (marketing site)
+        - Docs site
+        - Cross-cutting
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The user need or gap, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you'd approach it. Sketch an API shape, a screen, whatever's relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

@@ -1,0 +1,56 @@
+---
+title: OCR Submission
+description: Submitting a label the on-device Vision framework read.
+---
+
+`POST /api/v1/ocr/submit` · **requires auth** · 20/hr per device
+
+The client runs OCR itself (Apple's Vision framework, live multi-frame —
+see [iOS: Architecture](/docs/ios)) and sends the untouched recognized text
+alongside what the user confirmed after reviewing it. No image is uploaded.
+
+```json
+{
+  "barcode": "8901030895564",
+  "country": "IN",
+  "extracted_text": "HALDIRAM'S\nAloo Bhujia\nIngredients: Gram flour…",
+  "reviewed_ingredients": "Gram flour, Palm oil, Salt",
+  "reviewed_allergens": ["Peanut"],
+  "product_name": "Aloo Bhujia",
+  "brand": "Haldiram's",
+  "nutrition": { "energy_kcal": 546, "fat": 36.4, "sugar": 2.4, "sodium": 1.18 }
+}
+```
+
+`product_name`, `brand`, and `nutrition` are optional — older clients send
+only the ingredient side. `nutrition` is filtered server-side to the
+thirteen known keys with finite values in `0…1000` before anything is
+written.
+
+## Why `extracted_text` is sent at all
+
+It's the audit trail. The server re-parses it and compares against the
+reviewed fields:
+
+- A submission that silently **drops an allergen** the raw OCR clearly
+  found is stored as `flagged_allergen_mismatch` — a safety issue, not a
+  style edit, checked regardless of how much the ingredient text changed.
+- A submission whose ingredients were **wholesale replaced** (low overlap
+  between what OCR found and what was submitted) is stored as
+  `flagged_low_confidence`.
+- Otherwise: `pending_verification`.
+
+Genuine corrections — fixing one bad OCR line, reordering — leave most of
+what OCR actually found intact, so they don't get flagged; this is checking
+for wholesale fabrication, not penalizing edits.
+
+The contribution is attributed to the token's device (for
+[contribution stats](/docs/backend/api-reference/me#contribution-stats)).
+A successful submission also inserts the product itself
+(`source: "user_contributed"`, `verified: false`) with
+`ON CONFLICT (barcode) DO NOTHING`, so the barcode is searchable
+immediately without unverified data ever clobbering an existing row.
+
+```json title="Response"
+{ "guessedName": "Aloo Bhujia", "ingredients": "Gram flour, Palm oil, Salt", "allergens": ["Peanut"] }
+```

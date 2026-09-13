@@ -2,7 +2,13 @@
 
 > **Open-source barcode scanner with a crowdsourced, community-verified nutrition database.**
 
-TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food and nutrition facts, and crowdsource missing or unverified food labels using AI-driven OCR and peer verification.
+TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food and nutrition facts, and crowdsource missing or unverified food labels using on-device OCR and peer verification.
+
+> **📚 Full developer documentation, with search:** the details below get you
+> running locally; anything deeper — the complete API reference, the iOS
+> app's architecture, deployment internals — lives at
+> [`web/apps/docs`](web/apps/docs) (`bun run dev --filter=docs`, or wherever
+> it's deployed). This README stays a fast-orientation doc on purpose.
 
 ---
 
@@ -10,9 +16,10 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 
 1. [Local Development Setup](#-local-development-setup)
    - [Prerequisites](#prerequisites)
-   - [Option A: Running Locally with Cargo](#option-a-running-locally-with-cargo)
-   - [Option B: Running on Local Kubernetes (KinD)](#option-b-running-on-local-kubernetes-kind)
-2. [Product Roadmap](#-product-roadmap)
+   - [Backend](#backend)
+   - [iOS App](#ios-app)
+   - [Web Apps](#web-apps)
+2. [Project Status](#-project-status)
 3. [System Architecture](#-system-architecture)
    - [High-Level Diagram](#high-level-diagram)
    - [Data Flow: Successful Barcode Scan](#data-flow-successful-barcode-scan)
@@ -20,173 +27,77 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 4. [Database Schema](#-database-schema)
 5. [API Contract](#-api-contract)
 6. [Project Structure](#-project-structure)
-7. [SDLC & Sprint Workflow](#-sdlc--sprint-workflow)
-8. [Architectural Decisions (ADRs)](#-architectural-decisions-adrs)
-9. [Data Quality & Verification Strategy](#-data-quality--verification-strategy)
-10. [Deployment & Infrastructure](#-deployment--infrastructure)
-11. [Monitoring & Analytics](#-monitoring--analytics)
-12. [Testing Strategy](#-testing-strategy)
-13. [Timeline Overview](#-timeline-overview)
+7. [Architectural Decisions (ADRs)](#-architectural-decisions-adrs)
+8. [Data Quality & Verification Strategy](#-data-quality--verification-strategy)
+9. [Deployment](#-deployment)
+10. [Monitoring & Analytics](#-monitoring--analytics)
+11. [Testing Strategy](#-testing-strategy)
+12. [Contributing](#-contributing)
+13. [License](#-license)
 
 ---
 
 ## 🛠️ Local Development Setup
 
+Each app is independent — you don't need all three running to work on one.
+For the full walkthrough with more detail, see the
+[Getting Started](web/apps/docs/content/docs/getting-started.mdx) doc.
+
 ### Prerequisites
 
-- **Rust**: 1.85+ (`rustup default stable`)
-- **Docker**: Docker Desktop / OrbStack / Docker CLI
-- **Kubernetes & KinD**: `kind` CLI and `kubectl` (for cluster testing)
-- **Xcode**: 16+ (for iOS App development)
-- **PostgreSQL & Redis**: (Optional if running native without containers)
+- **Backend**: Rust stable (`rustup default stable`), Docker (or native Postgres 17 + Redis 7)
+- **iOS**: Xcode 26+ (iOS 26.5 SDK)
+- **Web**: [bun](https://bun.sh) 1.3.8, Node 24+
 
----
+### Backend
 
-### Option A: Running Locally with Cargo
-
-1. **Navigate to the backend directory**:
-
-   ```bash
-   cd backend
-   ```
-
-2. **Configure Environment Variables**:
-   Copy `.env.local` to `.env`:
-
-   ```bash
-   cp .env.local .env
-   ```
-
-   *Default local configuration:*
-
-   ```ini
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-   REDIS_URL=redis://localhost:6379
-   SERVER_HOST=0.0.0.0
-   SERVER_PORT=8080
-   APP_ENV=development
-   ```
-
-3. **Run Postgres and Redis** (via Docker or native):
-
-   ```bash
-   docker run -d --name truelabel-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:latest
-   docker run -d --name truelabel-redis -p 6379:6379 redis:latest
-   ```
-
-4. **Run Backend Service**:
-
-   ```bash
-   cargo run
-   ```
-
-5. **Verify Health**:
-
-   ```bash
-   curl http://localhost:8080/health
-   curl http://localhost:8080/health/ready
-   ```
-
----
-
-### Option B: Running on Local Kubernetes (KinD)
-
-1. **Create the KinD Cluster**:
-
-   ```bash
-   kind create cluster --config .kind/local-cluster.yml --name true-lable-cluster
-   ```
-
-2. **Apply Secrets, Persistent Volumes, and Services**:
-
-   ```bash
-   kubectl apply -f .kind/secrets/backend-secrets.yml
-   kubectl apply -f .kind/deployment/db-init.yaml
-   kubectl apply -f .kind/deployment/redis-init.yaml
-   kubectl apply -f .kind/service/db-service.yml
-   kubectl apply -f .kind/service/redis-service.yml
-   ```
-
-3. **Build and Load Backend Docker Image**:
-
-   ```bash
-   docker build -t true-lable-backend:latest ./backend
-   kind load docker-image true-lable-backend:latest --name true-lable-cluster
-   ```
-
-4. **Deploy Backend**:
-
-   ```bash
-   kubectl apply -f .kind/deployment/backend-deployment.yml
-   kubectl apply -f .kind/service/backend-service.yml
-   ```
-
-5. **Verify Pod Status**:
-
-   ```bash
-   kubectl get pods -w
-   ```
-
----
-
-## 🗺️ Product Roadmap
-
-```
-  Phase 0: MVP (Weeks 1-5)             Phase 1: Crowdsourcing (Weeks 6-10)
-┌─────────────────────────────────┐   ┌─────────────────────────────────┐
-│ • Scan barcode → OFF Lookup     │   │ • Photo label capture (OCR)     │
-│ • "Product not found" state     │──▶│ • Postgres persistence          │
-│ • Redis 5-min caching           │   │ • Unverified product queue      │
-│ • 10 internal beta users        │   │ • 100+ beta users, 1K+ items    │
-└─────────────────────────────────┘   └─────────────────────────────────┘
-                 │
-                 ▼
-  Phase 2: Smart Serving (Weeks 11-14) Phase 3: Public Launch (Weeks 15-16)
-┌─────────────────────────────────┐   ┌─────────────────────────────────┐
-│ • ≥3 verifications = Verified   │   │ • iOS App Store + TestFlight    │
-│ • 1-2 verifications = Badge     │──▶│ • India community launch        │
-│ • Confidence scoring engine     │   │ • Sentry & PostHog monitoring   │
-│ • 500+ DAU (80%+ success rate)  │   │ • 1000+ DAU target              │
-└─────────────────────────────────┘   └─────────────────────────────────┘
+```bash
+docker compose up -d postgres redis      # from the repo root
+cd backend
+cp .env.example .env                     # defaults already match the compose services
+cargo run                                # migrations run automatically on boot
+curl http://localhost:8080/health/ready
 ```
 
-### Phase 0: MVP (Weeks 1–5)
+Run tests with `cargo test`. See [Environment Variables](web/apps/docs/content/docs/backend/index.mdx)
+for what every `.env` value does — `TRUSTED_PROXY_HOPS` and
+`ALLOWED_ORIGINS` only matter once this runs behind a real reverse proxy,
+not for local dev.
 
-- **Goal**: Validate core flow.
-- Scan barcode → Lookup from Open Food Facts.
-- If not found → Show "Product not found".
-- Local history caching in iOS.
-- **Database**: Redis only (API caching).
-- **Users**: Internal testing + 10 beta users.
-- **Success Metric**: 10 successful scans from beta users.
+### iOS App
 
-### Phase 1: Crowdsourced Verification (Weeks 6–10)
+```bash
+cd ios/truelable
+open truelable.xcodeproj    # scheme: truelable
+```
 
-- **Goal**: Enable data collection.
-- Product not found → Capture photo of nutrition label.
-- Google Vision OCR extracts barcode, name, ingredients, and nutrition.
-- Prompt user: *"Is this correct?"* → Save to DB as `unverified`.
-- Subsequent users prompted: *"Help verify this product (X people added it)"*.
-- **Database**: PostgreSQL (Products, Verifications, OCR Submissions).
-- **Users**: 100+ beta users.
-- **Success Metric**: 1,000+ products added and verified by 2+ users.
+Point `APIEnvironment` at a running backend via the `API_BASE_URL` scheme
+environment variable if `localhost:8080` isn't reachable (e.g. testing on a
+physical device).
 
-### Phase 2: Smart Serving (Weeks 11–14)
+> To just verify a change compiles and its tests pass, prefer
+> `xcodebuild -scheme truelable -destination 'platform=iOS Simulator,name=<device>' build-for-testing`
+> over actually launching the Simulator — much faster when you don't need
+> to see the UI.
 
-- **Goal**: Show verified data confidently.
-- $\ge 3$ verifications $\rightarrow$ Serve as **Verified** (Green Checkmark).
-- $1\text{--}2$ verifications $\rightarrow$ Serve with **"Unverified"** badge.
-- $0$ verifications $\rightarrow$ Prompt user to verify label.
-- Confidence scoring system based on OCR quality + user confirmations.
-- **Users**: 500+ DAU.
-- **Success Metric**: 80%+ scan success rate.
+### Web Apps
 
-### Phase 3: Launch Public (Weeks 15–16)
+```bash
+cd web
+bun install
+bun run dev             # marketing site :3000, docs site :3001, in parallel
+```
 
-- **Goal**: Public beta on iOS + TestFlight release.
-- India-specific community marketing (Instagram, fitness/health groups).
-- Monitor data quality and volunteer verification rate.
-- **Users**: 1,000+ DAU target.
+---
+
+## 📌 Project Status
+
+Past the MVP stage described in earlier planning docs — the backend has a
+full product-lookup/search/trending/verification API, device-token auth
+with optional Sign in with Apple, Redis-backed rate limiting, and OCR
+submission; the iOS app is a full SwiftUI rewrite (scan, verify, history,
+profile, TrueLabel Plus). See the [docs site](web/apps/docs) for the
+current architecture in depth rather than a sprint-by-sprint history here.
 
 ---
 
@@ -196,33 +107,36 @@ TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food 
 
 ```markdown
 ┌─────────────────────────────────────────────────────────────┐
-│                     iOS App (Swift)                         │
+│                    iOS App (SwiftUI)                        │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │ • Barcode Scanner (VisionKit / AVFoundation)         │  │
-│  │ • Photo Capture (Nutrition Labels)                   │  │
-│  │ • Local History Cache (CoreData / SwiftData)         │  │
-│  │ • Device State & Location Management                 │  │
+│  │ • Barcode Scanner (DataScannerViewController)         │  │
+│  │ • On-device OCR of labels (Apple Vision, no network)  │  │
+│  │ • Local history + preferences (SwiftData)             │  │
+│  │ • Device token in Keychain                            │  │
 │  └──────────────────┬───────────────────────────────────┘  │
 └─────────────────────┼──────────────────────────────────────┘
-                      │ HTTPS (REST API)
-        ┌─────────────┴──────────────┐
-        │                            │
-        ▼                            ▼
-    ┌──────────────────────┐  ┌──────────────────┐
-    │  Rust Backend API    │  │ AWS S3 / Cloud   │
-    │  (Axum / Tokio)      │  │ (Image storage)  │
-    │  Port: 8080          │  │                  │
-    └──────────┬───────────┘  └──────────────────┘
+                      │ HTTPS (REST API, Bearer token)
+                      ▼
+            ┌──────────────────────┐
+            │  Rust Backend API    │
+            │  (Axum / Tokio)      │
+            │  behind nginx (TLS)  │
+            └──────────┬───────────┘
                │
     ┌──────────┼──────────┬─────────────┐
     │          │          │             │
     ▼          ▼          ▼             ▼
 ┌─────────┐ ┌──────┐ ┌──────────┐ ┌─────────┐
-│ Redis   │ │  DB  │ │  Open    │ │ Google  │
-│ (Cache) │ │Post- │ │  Food    │ │ Vision  │
-│5min TTL │ │ gres │ │  Facts   │ │ (OCR)   │
+│ Redis   │ │  DB  │ │  Open    │ │  Apple  │
+│(rate    │ │Post- │ │  Food    │ │ (Sign   │
+│ limits) │ │ gres │ │  Facts   │ │ in w/   │
+│         │ │      │ │          │ │ Apple)  │
 └─────────┘ └──────┘ └──────────┘ └─────────┘
 ```
+
+No image storage exists anywhere in this system — OCR happens entirely
+on-device, and only the extracted text (not the photo) is ever sent to the
+backend.
 
 ---
 
@@ -267,8 +181,8 @@ sequenceDiagram
     autonumber
     actor User1 as Contributor
     participant iOS1 as Contributor App
+    participant Vision as Apple Vision (on-device)
     participant API as Rust Backend
-    participant Vision as Google Vision OCR
     participant DB as PostgreSQL
     actor User2 as Verifier
     participant iOS2 as Verifier App
@@ -276,17 +190,17 @@ sequenceDiagram
     User1->>iOS1: Scans Barcode (Not Found)
     iOS1->>User1: Prompt: "Product Not Found. Help us add it?"
     User1->>iOS1: Captures Label Photo
-    iOS1->>API: POST /api/v1/products/submit_label
-    API->>Vision: Text Detection and OCR Extraction
-    Vision-->>API: Raw Text and Confidence Score
-    API->>API: Parse Nutrition, Ingredients, and Brand
-    API->>DB: Insert ocr_submissions and unverified product
-    API-->>iOS1: Extracted Nutrition Data
-    iOS1->>User1: "Is this correct?" (Review and Edit)
-    User1->>iOS1: Clicks Confirm
+    iOS1->>Vision: Extract text on-device (no network)
+    Vision-->>iOS1: Raw text
+    iOS1->>API: POST /api/v1/ocr/submit (extracted_text, reviewed_ingredients)
+    API->>API: Compare extracted_text vs reviewed_ingredients
+    (ingredient_overlap_ratio)
+    API->>DB: Insert ocr_submissions + unverified product
+    API-->>iOS1: pending_verification / flagged_low_confidence
+    User1->>iOS1: Reviews and confirms
     iOS1->>API: POST /api/v1/products/verify (confirmed: true)
     API->>DB: Insert verification record (count = 1)
-    
+
     Note over User2, DB: Next User Scans Same Barcode
     User2->>iOS2: Scans Same Barcode
     iOS2->>API: GET /api/v1/products/search
@@ -337,10 +251,14 @@ Migrations run automatically at boot (`db::run_migrations`), in
 ```
 
 A fourth table, `users`, is one row per device — `device_id` (the primary
-key), `country`, `dietary_preferences` (a JSONB array), and the three Plus
-columns `plus_since` / `plus_expires_at` / `plus_source`. There are no
-accounts, so nothing links a row to a person beyond the vendor identifier the
-device already hands out.
+key), `country`, `dietary_preferences` (a JSONB array), `token_hash` /
+`token_issued_at` (SHA-256 of the bearer token, never the token itself), the
+three Plus columns `plus_since` / `plus_expires_at` / `plus_source`, and the
+optional Sign-in-with-Apple linkage: `apple_user_id`, `email`,
+`display_name`, `linked_at`. A device row exists from first launch with all
+of those Apple/email columns `NULL`; linking an Apple ID later fills them in
+without changing `device_id` — the device stays the primary identity, the
+Apple account is just attached to it.
 
 Notes that matter when querying:
 
@@ -926,64 +844,49 @@ clobbering an existing row.
 
 ```markdown
 true-lable/
-├── backend/                        # Rust Backend Service
+├── backend/                        # Rust backend (Axum + Tokio)
 │   ├── Cargo.toml
-│   ├── Dockerfile                  # Multi-stage release build (34 MB)
-│   ├── .dockerignore
-│   ├── .env.local                  # Local development config
-│   ├── .env.docker                 # Container environment config
+│   ├── .env.example
+│   ├── migrations/                 # SQLx migrations, run automatically at boot
 │   └── src/
-│       ├── main.rs                 # Server entrypoint & graceful shutdown
-│       ├── lib.rs                  # Library root & app assembler
-│       ├── config/
-│       │   ├── mod.rs
-│       │   └── env.rs              # Typed configuration with credential masking
-│       ├── db/
-│       │   ├── mod.rs
-│       │   ├── postgres.rs         # Postgres pool manager & health checks
-│       │   └── redis.rs            # Redis multiplexed connection manager
-│       ├── error.rs                # Centralized AppError enum (Axum IntoResponse)
-│       ├── state.rs                # AppState container (PgPool, Redis, Config)
-│       └── routes/
-│           ├── mod.rs              # Root router + CORS + TraceLayer
-│           ├── health.rs           # /health, /health/live, /health/ready
-│           └── v1/
-│               ├── mod.rs
-│               └── products.rs     # Search & barcode lookup endpoints
-├── ios/                            # iOS Native App (SwiftUI)
-│   └── BarcodeScanner/
-│       ├── App/                    # App lifecycle
-│       ├── Models/                 # Product, Nutrition, Verification models
-│       ├── Views/                  # ScannerView, DetailView, OCRConfirmView
-│       ├── ViewModels/             # ScannerViewModel, ProductViewModel
-│       └── Services/               # APIClient, LocalHistory, CameraService
-├── .kind/                          # Local Kubernetes (KinD) manifests
-│   ├── local-cluster.yml           # 3-node cluster with port mappings
-│   ├── deployment/                 # Backend, Postgres, Redis deployments
-│   ├── service/                    # ClusterIP and NodePort services
-│   └── secrets/                    # Secret configurations
+│       ├── main.rs                 # Entrypoint & graceful shutdown
+│       ├── lib.rs                  # App assembler
+│       ├── auth.rs                 # Device-token issuing & verification
+│       ├── config/env.rs           # Typed config, credential masking
+│       ├── db/{postgres,redis}.rs
+│       ├── error.rs                # AppError → HTTP status mapping
+│       ├── state.rs                # AppState (PgPool, Redis, Config)
+│       ├── middleware/             # logging, error_handler
+│       ├── routes/
+│       │   ├── health.rs
+│       │   └── v1/{products,ocr,me}.rs
+│       ├── handlers/{products,ocr,users}.rs
+│       ├── services/
+│       │   ├── product_service.rs
+│       │   ├── ocr_service.rs      # ingredient_overlap_ratio confidence check
+│       │   ├── openfoodfacts.rs
+│       │   ├── cache_service.rs
+│       │   ├── user_service.rs
+│       │   └── apple_auth.rs       # Sign in with Apple JWT verification
+│       └── models/{product,ocr,user,verification,response}.rs
+├── ios/truelable/truelable/        # iOS app (SwiftUI, iOS 26+)
+│   ├── App/                        # TrueLabelApp, RootView, AppRouter
+│   ├── Core/                       # APIClient, DeviceAuth, Account, Preferences, Plus
+│   ├── Design/                     # Theme.swift (enum TL), Components.swift
+│   └── Features/
+│       ├── Home/ Onboarding/ Scan/ Product/ History/
+│       └── Verify/ Profile/ Account/ Plus/ Contribute/ Search/
+├── web/                             # Turborepo (bun workspaces)
+│   ├── apps/web/                   # Marketing site (Next.js)
+│   ├── apps/docs/                  # Developer docs (Fumadocs) — you are here
+│   └── packages/{ui,eslint-config,typescript-config}/
+├── deploy/                          # Real production deployment (droplet)
+│   ├── nginx-api.truelabel.fun.conf
+│   └── truelabel-backend.service   # systemd unit
+├── .github/                          # Issue/PR templates, CI
+├── k8s/  infra/                     # NOT current production — see Deployment below
 └── README.md
 ```
-
----
-
-## 📅 SDLC & Sprint Workflow
-
-### Phase 0: MVP (Weeks 1–5)
-
-- **Sprint 1 (Week 1)**: Rust backend foundation (`axum`, `sqlx`, `redis`), `GET /products/search` draft, basic iOS Vision scanner.
-- **Sprint 2 (Week 2)**: Open Food Facts API integration, Redis 5-min caching layer, end-to-end barcode scan flow.
-- **Sprint 3 (Week 3)**: iOS local scan history persistence (CoreData/SwiftData), structured error handling, and request logging.
-- **Sprint 4 (Week 4)**: "Product Not Found" fallback handling, backend rate-limiting (3–4 req/sec), staging deployment.
-- **Sprint 5 (Week 5)**: UI polish, 10-user internal beta test, Sentry instrumentation.
-
-### Phase 1: Crowdsourced Verification (Weeks 6–10)
-
-- **Sprint 6 (Week 6)**: `ocr_submissions` + `verifications` schema, `POST /products/submit_label`, Google Vision OCR integration.
-- **Sprint 7 (Week 7)**: iOS label photo capture, image compression, OCR result preview & edit screen.
-- **Sprint 8 (Week 8)**: `POST /products/verify` endpoint, verification counting logic ($\ge 3$ threshold).
-- **Sprint 9 (Week 9)**: Unverified product discovery UI ("Help verify this product"), peer-verification loop.
-- **Sprint 10 (Week 10)**: OCR confidence score integration, 100+ beta testers via TestFlight.
 
 ---
 
@@ -991,109 +894,114 @@ true-lable/
 
 | Component | Choice | Rationale | Alternatives Considered |
 | --- | --- | --- | --- |
-| **Database** | **PostgreSQL** | Relational integrity, JSONB support for variable nutrition tables, indexed lookup for millions of rows. | *Redis-only* (no persistence), *CockroachDB* (overkill for MVP). |
-| **Cache** | **Redis** | Sub-5ms response time for repeat scans; 5-min TTL absorbs traffic spikes from popular items. | *In-memory LRU* (doesn't scale across replicas). |
-| **OCR Engine** | **Google Vision API** | 95%+ accuracy on curved/glossy food packaging; fast cloud inference; cost negligible (~$1.50/1K requests). | *On-device ML* (large app size, high battery drain, low accuracy on wrinkled labels). |
-| **Backend Framework** | **Rust (Axum + Tokio)** | Memory safety, blazing performance, low resource footprint (runs in 64MB container), strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
+| **Database** | **PostgreSQL** | Relational integrity, JSONB support for variable nutrition tables, `pg_trgm` for search. | *Redis-only* (no persistence), *CockroachDB* (overkill). |
+| **Cache** | **Redis** | Product lookup cache + rate-limit counters, sub-5ms. | *In-memory LRU* (doesn't scale across replicas). |
+| **OCR** | **On-device Apple Vision** (`DataScannerViewController`, text mode) | No photo ever leaves the device, zero OCR API cost, no image-storage requirement. Confidence comes from server-side `ingredient_overlap_ratio` against reviewed text, not a vendor score. | *Cloud OCR (Google/AWS Vision)* — rejected: recurring cost, requires image upload/storage, adds a network round-trip to every contribution. |
+| **Auth** | **Device bearer token** (+ optional Sign in with Apple) | No password to leak; only `SHA-256(token)` is stored; device id never appears in a URL. | *Full account system* — deferred; Apple Sign-In is implemented server-side but off client-side pending a paid Apple Developer team. |
+| **Backend Framework** | **Rust (Axum + Tokio)** | Memory safety, low resource footprint, strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
+| **Production hosting** | **Single droplet, nginx + systemd** | Simple, cheap, matches actual current traffic. | *Kubernetes (EKS)* — was built out (`k8s/`, `infra/`, `.github/workflows/ci-cd.yml`) but is **not** what's actually running; see [Deployment](#-deployment--infrastructure). |
 
 ---
 
 ## 🛡️ Data Quality & Verification Strategy
 
 ```markdown
-                          ┌───────────────────────────┐
-                          │ User submits label photo  │
-                          └─────────────┬─────────────┘
-                                        ▼
-                          ┌───────────────────────────┐
-                          │ Google Vision OCR extracts│
-                          └─────────────┬─────────────┘
-                                        │
-                         Confidence Score > 0.85?
-                                ├─── Yes ───▶ Show extracted values for 1-click confirmation
-                                └───  No  ───▶ Prompt user to manually fill missing fields
-                                        │
-                                        ▼
-                          ┌───────────────────────────┐
-                          │ Stored as "Unverified"    │
-                          │ (verification_count = 1)  │
-                          └─────────────┬─────────────┘
-                                        │
-                 ┌──────────────────────┴──────────────────────┐
-                 ▼                                             ▼
-  Count < 3: Serve with "Unverified" Badge      Count ≥ 3: Mark "Verified" (Green Checkmark)
+        ┌────────────────────────────┐
+        │ User captures label photo  │
+        └─────────────┬──────────────┘
+                       ▼
+        ┌────────────────────────────┐
+        │ On-device Apple Vision OCR │   (no network call, no image sent)
+        └─────────────┬──────────────┘
+                       ▼
+   Backend compares extracted_text vs. reviewed_ingredients
+              (ingredient_overlap_ratio)
+                       │
+        ┌──────────────┼───────────────┐
+        ▼              ▼               ▼
+   pending_       flagged_low_    flagged_allergen_
+ verification      confidence         mismatch
+        │
+        ▼
+  Stored as unverified (verification_count = 1)
+        │
+  ┌─────┴─────┐
+  ▼           ▼
+Count < 3   Count ≥ 3
+"Unverified" "Verified" (green checkmark)
 ```
 
-1. **Verification Thresholds**:
-   - `0-2 Verifications`: Served with an **"Unverified - X people added this"** badge.
-   - `≥ 3 Verifications`: Automatically upgraded to **Verified** status with full confidence.
-2. **Confidence Scoring**: Google Vision OCR returns token confidence; if confidence $< 0.85$, the user is prompted to verify and edit raw text.
-3. **Manual Overrides**: Any edits made by users during submission are flagged and given higher weight upon subsequent peer confirmations.
+1. **Verification thresholds**: `0–2` verifications shows an "Unverified — X people added this" badge; `≥ 3` flips `verified` to `true`.
+2. **Confidence**: not a vendor OCR score — the backend measures how much of the client's raw scanned text overlaps the ingredient list the user actually submitted (`ocr_service.rs`), flagging low overlap or an allergen appearing in the text but not the reviewed list.
+3. **Open Food Facts rows** go through a separate honesty check (see [Database Schema](#-database-schema) → *Staying in step with Open Food Facts*) rather than the peer-verification counter, since those rows didn't come from a user submission.
 
 ---
 
 ## 🚀 Deployment & Infrastructure
 
-### Cost Breakdown (Estimated MVP / Month 1)
+Production is a **single DigitalOcean droplet** — nginx terminates TLS and
+reverse-proxies to the backend on `127.0.0.1:8080`; systemd
+(`truelabel-backend.service`, sandboxed: `NoNewPrivileges`, `ProtectSystem`,
+a dedicated non-root user) keeps the binary running and restarts it on
+failure. Full details, including the nginx `limit_req`/`limit_conn` zones,
+live in [`deploy/README.md`](deploy/README.md); the two settings that matter
+most for correctness are `SERVER_HOST=127.0.0.1` (never bind the app itself
+to a public interface — nginx is the only thing that should be) and
+`TRUSTED_PROXY_HOPS=1` (so rate limiting reads the real client IP nginx
+forwards, not a spoofable header).
 
-| Service | Provider | Purpose | Estimated Monthly Cost |
-| --- | --- | --- | --- |
-| **API Compute** | Railway / Fly.io / KinD | Rust backend container | \$10 – \$20 |
-| **Database** | Supabase / Railway | Managed PostgreSQL | \$0 – \$10 (Free Tier) |
-| **Cache** | Upstash / Railway | Managed Redis | \$0 – \$5 (Free Tier) |
-| **OCR API** | Google Cloud Vision | Text detection from label photos | \$0 – \$20 (First 1K free) |
-| **Image Storage** | Cloudflare R2 / AWS S3 | Cropped nutrition label images | \$1 – \$5 |
-| **Total** | | | **\$15 – \$60 / month** |
+> **⚠️ Known inconsistency:** this repo also contains `k8s/` (Kustomize),
+> `infra/` (Terraform for AWS/DigitalOcean), and
+> `.github/workflows/ci-cd.yml` (which deploys a Docker image to an EKS
+> cluster on push to `main`). None of that is what's actually running —
+> it predates the move to the droplet and hasn't been reconciled yet.
+> Don't treat it as documentation of production; treat it as a TODO to
+> either finish migrating to or delete.
 
 ---
 
 ## 📊 Monitoring & Analytics
 
-- **Performance Metrics**:
-  - P95 API Latency (Target: $< 500\text{ms}$)
-  - Cache Hit Ratio (Target: $> 70\%$)
-  - Open Food Facts API failure rate
-- **Data Quality Metrics**:
-  - Verification count distribution
-  - Average OCR confidence score
-  - User edit rate per submission
-- **Tools**:
-  - **Sentry**: Error reporting and panic monitoring.
-  - **PostHog**: Product analytics (Scans/day, verification conversion rate).
-  - **Prometheus + Grafana**: Container CPU/memory and latency metrics.
+Nothing here is wired up yet — this is the plan, not current state:
+
+- **Performance**: P95 API latency, Redis cache hit ratio, Open Food Facts failure rate.
+- **Data quality**: verification-count distribution, `ingredient_overlap_ratio` distribution, flag rate.
+- **Planned tools**: Sentry (errors), PostHog (product analytics), Prometheus + Grafana (container metrics). None are currently integrated in `backend/` or the iOS app — the only present signal today is structured request logging (`middleware/logging.rs`) and the `/health`, `/health/live`, `/health/ready` endpoints.
 
 ---
 
 ## 🧪 Testing Strategy
 
-- **Unit Tests**:
-  - Nutrition parser test suite with mock OCR outputs.
-  - Configuration environment variable loaders (race-free with mutex guards).
-  - Error code status mapping (`AppError` $\rightarrow$ HTTP Status Code).
+```bash
+cd backend && cargo test    # unit tests: auth, rate limiting, subscription logic,
+                             # nutrient parsing, error → status mapping
+                             # + one full HTTP integration test via tower::ServiceExt::oneshot
+```
 
-  ```bash
-  cd backend && cargo test
-  ```
+```bash
+xcodebuild -scheme truelable \
+  -destination 'platform=iOS Simulator,name=<device>' \
+  build-for-testing          # compiles + runs iOS unit tests without launching the Simulator
+```
 
-- **Integration Tests**:
-  - Full HTTP request lifecycle tests using `tower::ServiceExt::oneshot`.
-  - Database pool connectivity and health ping validation.
-- **Load Testing**:
-  - 100 concurrent simulated scans via `k6` / `drill` to ensure sub-500ms P95 latency.
+```bash
+cd web && bun run lint && bun run check-types && bun run build
+```
+
+No load testing or CI-enforced coverage threshold exists yet.
 
 ---
 
-## ⏱️ Timeline Overview
+## 🤝 Contributing
 
-| Period | Phase | Key Deliverable |
-| --- | --- | --- |
-| **Weeks 1–5** | **Phase 0: MVP** | Barcode scan $\rightarrow$ Open Food Facts $\rightarrow$ Local history caching |
-| **Weeks 6–10** | **Phase 1: Crowdsourcing** | Label capture $\rightarrow$ Google Vision OCR $\rightarrow$ Peer verification |
-| **Weeks 11–14** | **Phase 2: Smart Serving** | Confidence scoring, verification threshold engine ($\ge 3$), TestFlight beta |
-| **Weeks 15–16** | **Phase 3: Public Launch** | App Store public release, monitoring, community outreach |
+Branch strategy is `main` → `test` → `sit` → `dev`; open PRs against `dev`.
+See [`web/apps/docs/content/docs/contributing.mdx`](web/apps/docs/content/docs/contributing.mdx)
+for the full guide and use the issue templates under
+[`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE) to file bugs, feature
+requests, or chores.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [Apache License 2.0](file:///Users/tarunvishwakarma/Documents/MacAntigravity/personal-proj/true-lable/License).
+This project is licensed under the [Apache License 2.0](License).

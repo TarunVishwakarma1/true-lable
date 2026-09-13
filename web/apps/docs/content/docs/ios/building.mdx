@@ -1,0 +1,43 @@
+---
+title: Building & Testing
+description: xcodebuild, no Simulator launches, StoreKit config.
+---
+
+```bash
+cd ios/truelable
+open truelable.xcodeproj
+```
+
+Scheme: **`truelable`** (targets `truelable`, `truelableTests`,
+`truelableUITests`). Deployment target: **iOS 26.5**.
+
+<Callout type="warn" title="Verify with build-for-testing, not the Simulator">
+  Launching the Simulator is slow and usually unnecessary just to confirm a
+  change compiles and its tests pass:
+
+  ```bash
+  xcodebuild -scheme truelable -destination 'platform=iOS Simulator,name=<device>' build-for-testing
+  ```
+
+  Reach for the Simulator only when you actually need to see or interact
+  with a UI change.
+</Callout>
+
+## Testing Plus locally
+
+`TrueLabel.storekit` is a StoreKit configuration file for testing the
+subscription UI without hitting App Store Connect —
+`Plus.monthlyID`/`.yearlyID` map to `fun.truelabel.plus.monthly` /
+`fun.truelabel.plus.yearly`. Select it as the scheme's StoreKit
+configuration in Xcode's scheme editor to exercise the real
+`SubscriptionStoreView` path; without it, the app falls back to the
+backend's giveaway-mode Plus (see [Subscription](/docs/backend/api-reference/me#subscription)).
+
+## Sign in with Apple
+
+Off by default (`Capabilities.signInWithApple = false` in
+`Core/Capabilities.swift`) because it needs a paid Apple Developer Program
+team to provision the entitlement — a personal team fails outright. Flip
+it on together with `truelable.entitlements`'
+`com.apple.developer.applesignin` capability once a paid team is attached;
+no backend change is needed, it already verifies identity tokens.

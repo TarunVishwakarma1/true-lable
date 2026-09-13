@@ -1,0 +1,143 @@
+---
+title: Architecture
+description: SwiftUI, iOS 26.5+, no third-party dependencies.
+---
+
+Lives at `ios/truelable`, scheme **`truelable`**. Native SwiftUI, no
+external Swift packages — networking, persistence, and design system are
+all hand-built against Apple's own frameworks (URLSession, SwiftData,
+Keychain Services).
+
+## Layout
+
+```
+truelable/
+├── App/
+│   ├── TrueLabelApp.swift    Entry point — owns the ModelContainer, the AppRouter environment object
+│   └── RootView.swift         TabView (Home/History/Verify/You) + bottom-accessory Scan button
+├── Core/
+│   ├── APIClient.swift         All networking — see /docs/ios/networking
+│   ├── APIEnvironment.swift     Base URL (API_BASE_URL env override)
+│   ├── DeviceAuth.swift          Keychain-backed bearer token, single-flight registration
+│   ├── Account.swift              Sign in with Apple / name-only identity
+│   ├── Capabilities.swift          Feature flags (signInWithApple, off by default)
+│   ├── Preferences.swift            DietaryPreference, PersonalCheck, Threshold — see below
+│   ├── Plus.swift                    Subscription state (backend- or StoreKit-sourced)
+│   ├── Product.swift                  Product/Nutrition models, tolerant decoding
+│   ├── ScanRecord.swift                @Model — the one SwiftData persistence type
+│   ├── NutritionParser.swift            OCR text → Nutrition
+│   └── BarcodeChecksum.swift             EAN/UPC mod-10 validation
+├── Design/
+│   ├── Theme.swift             enum TL — every design token (see below)
+│   └── Components.swift         Buttons, ScoreRing, GradeStrip, BarMeter, StatTile, ProductCardRow, ...
+├── Features/
+│   ├── Home/          Landing tab — search bar, stat tiles, recents/popular strips
+│   ├── Onboarding/     3-page welcome/trust-model/dietary-preferences flow
+│   ├── Scan/            Camera + reticle + manual-entry sheet
+│   ├── Product/          Result screen and its cards (verdict, macros, sugar, allergens, alternatives, ...)
+│   ├── History/           Searchable scan history + compare mode
+│   ├── Verify/              Swipeable confirmation queue
+│   ├── Profile/               "You" tab — account, impact stats, trends, Plus, dietary chips
+│   ├── Account/                 Sign in with Apple / name-only variants, delete account
+│   ├── Plus/                     Marketing screen + subscription gate
+│   ├── Contribute/                Live-capture OCR wizard
+│   └── Search/                      Debounced search sheet
+├── TrueLabel.storekit    Local StoreKit config for testing Plus (monthly/yearly)
+└── truelable.entitlements
+```
+
+## Navigation — `AppRouter`
+
+An `@Observable` environment object (`App/TrueLabelApp.swift`):
+
+```swift
+enum Tab { case home, history, verify, you }
+enum Sheet: Identifiable { case manualEntry, search }
+
+var tab: Tab = .home
+var scannerPresented = false
+var sheet: Sheet?
+```
+
+`RootView` wires `.fullScreenCover(isPresented: $router.scannerPresented)`
+to `ScanScreen()`, and `.sheet(item: $router.sheet)` to `ManualEntrySheet`
+/ `SearchSheet`. Scanning lives in the tab bar's
+`.tabViewBottomAccessory`, not a fifth tab — reachable from anywhere
+without leaving the current tab. Each top-level tab owns its own
+`NavigationStack` and pushes a barcode string via
+`.navigationDestination(for: String.self)` into `ProductLoaderScreen`.
+Screen-local sheets (the compare picker on the product screen, the camera
+cover in the contribute flow) stay local to that screen rather than
+routing through `AppRouter`.
+
+## Persistence — `ScanRecord`
+
+The one SwiftData model (`Core/ScanRecord.swift`):
+
+```swift
+@Model
+final class ScanRecord {
+    @Attribute(.unique) var barcode: String
+    var name, brand: String
+    var imageURL: String?
+    var scannedAt: Date
+    var scanCount: Int
+    var calories: Int?
+    var sugarGrams, sodiumMg, proteinGrams: Double?
+    var nutriscoreGrade: String?
+    var novaGroup: Int?
+    var verified: Bool
+    var snapshot: Data   // full Product JSON — decoded lazily via `.product`
+}
+```
+
+`ScanRecord.record(_:in:bump:)` is the one insert-or-update entry point
+(called from `ProductLoaderScreen.load()`), upserting by barcode. The
+store lives in its own file (`truelabel-v2.store`, Application Support)
+with self-healing — if it fails to open (a schema mismatch from an older
+install), it's deleted and recreated rather than crashing the app.
+
+Everything else is `@AppStorage`/`UserDefaults`, not SwiftData: dietary
+preferences, the onboarding flag, verified-count tracking, cached account
+identity, recent searches.
+
+## Dietary preferences
+
+`Core/Preferences.swift` — 10 cases: `vegetarian`, `vegan`, `lowSugar`,
+`lowSodium`, `highProtein`, `peanutAllergy`, `lactoseSensitive`,
+`glutenFree`, `noPalmOil`, `jain`. Stored as a comma-joined string in
+`@AppStorage`, evaluated against a scanned `Product` by
+`PersonalCheck.run(_:on:)`, which returns `.good` / `.caution` / `.avoid` /
+`.unknown` with a real message — preferring structured tags
+(`labels`/`allergens`/`traces`/`nutrientLevels`) and falling back to
+ingredient-text keyword matching only for community-sourced products with
+no tags.
+
+<Callout type="info" title="Local-first, server-synced">
+  `RootView.task` pulls `dietary_preferences` from
+  `GET /api/v1/me/profile` on launch **only if local storage is empty** —
+  a fresh install after a reinstall, never an overwrite of what's already
+  set locally. `.onChange(of: dietaryRaw)` pushes local changes back via
+  `PUT /api/v1/me/profile`. Preferences are local-first with best-effort
+  backend sync, not purely local and not purely server-owned.
+</Callout>
+
+There's no separate "health profile" screen — the equivalent UI is the
+product screen's `ForYouCard` plus the shared `DietaryChips` component
+(used on both Onboarding's third page and the Profile tab's "Watch for"
+card).
+
+## Design tokens — `Design/Theme.swift`
+
+`enum TL`, dark-only. Warm charcoal ground (`bg` `#0C0B0A`), a bone-colored
+brand accent (`#EFE6D4`) deliberately kept *off* the verdict color ramp —
+so the brand color never also means "this product is good," which would
+quietly bias the UI. A full Nutri-Score-letter verdict ramp (good→danger),
+two chart-only hues, and brass reserved for Plus only. One motion curve
+(`Animation.tl(_:)`, the same ease-out-expo as the web app). Display type
+is serif (New York) — the one typographic signature; body/UI stay SF.
+
+`.card(_:fill:)` is the one surface treatment app-wide, using real
+`.glassEffect()` with a `reduceTransparency` accessibility fallback to a
+flat fill. `.screenBackground()` is a flat fill plus a **static**
+`MeshGradient` — explicitly not animated, so it costs nothing at runtime.

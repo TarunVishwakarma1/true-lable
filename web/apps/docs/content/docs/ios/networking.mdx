@@ -1,0 +1,68 @@
+---
+title: Networking
+description: Core/APIClient.swift — every backend call the app makes.
+---
+
+One `enum API`, one `URLSession`, one `Envelope<T> { status, data }`
+wrapper matching the backend's `ApiResponse<T>` exactly.
+
+```swift
+enum API {
+    static func product(barcode: String) async throws -> Product
+    static func search(_ q: String, limit: Int) async throws -> [ProductCard]
+    static func trending(limit: Int) async throws -> [ProductCard]
+    static func alternatives(barcode:, country:, sortBy:, limit:) async throws -> [ProductCard]
+    static func needsVerification(limit: Int) async throws -> [Candidate]
+    static func verify(barcode: String) async throws -> Product
+
+    static func registerDevice() async throws -> DeviceRegistration   // the only unauthenticated call
+
+    static func profile() async throws -> Profile
+    static func updateProfile(country:, dietaryPreferences:, displayName:) async throws -> Profile
+    static func stats() async throws -> ContributionStats
+    static func subscription() async throws -> Subscription
+    static func activatePlus() async throws -> Subscription
+    static func cancelPlus() async throws -> Subscription
+    static func linkApple(identityToken:, displayName:) async throws -> Profile
+    static func unlinkApple() async throws -> Profile
+    static func deleteAccount() async throws
+
+    static func submitLabel(_ submission: LabelSubmission) async throws -> OcrResult
+}
+```
+
+Every endpoint here corresponds 1:1 to an entry in the
+[API Reference](/docs/backend/api-reference/products) — if you're adding a
+new backend route, add the matching `API` case here in the same pass.
+
+## Auth
+
+Every call except `registerDevice()` sends
+`Authorization: Bearer <token>`. The token comes from
+`DeviceAuth.shared.token()` — an actor, single-flighted so concurrent
+callers don't trigger two registrations, backed by real Keychain storage
+(`kSecClassGenericPassword`, service `fun.truelabel.device`,
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`). On a `401`, the
+request layer calls `DeviceAuth.shared.forget()` and retries **once** with
+a freshly registered token.
+
+## Error mapping
+
+| Condition | Error |
+|---|---|
+| Transport failure (no connection, timeout) | `.offline` |
+| `401` (after the one retry) | `.unauthorized` |
+| `404` | `.notFound` |
+| `429` | `.rateLimited` |
+| Other non-2xx | `.server(code)` |
+| Decode failure | `.invalid` |
+
+Each case has a user-facing `errorDescription` — screens show these
+directly rather than a generic "something went wrong."
+
+## Pointing at a different backend
+
+`Core/APIEnvironment.swift` reads `API_BASE_URL` from the process
+environment if set (configure this on the Xcode scheme), otherwise
+defaults to `http://localhost:8080` in debug builds and the production API
+in release.

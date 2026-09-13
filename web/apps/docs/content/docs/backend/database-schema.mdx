@@ -1,0 +1,159 @@
+---
+title: Database Schema
+description: The current schema, from all 16 migrations.
+---
+
+Migrations run automatically at boot (`db::run_migrations`), from
+`backend/migrations/`. This is the schema they produce, as of the current
+migration set.
+
+## `products`
+
+```sql
+id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
+barcode             VARCHAR(20) NOT NULL UNIQUE
+country             VARCHAR(2) NOT NULL
+product_name        VARCHAR(255) NOT NULL
+brand               VARCHAR(255)
+image_url           TEXT
+nutrition_facts     JSONB NOT NULL
+ingredients         TEXT
+allergens           TEXT             -- legacy comma-joined text; superseded by allergens_tags for OFF products
+source              VARCHAR(50) NOT NULL   -- "open_food_facts" | "user_contributed"
+verified            BOOLEAN DEFAULT FALSE
+verification_count  INT DEFAULT 0
+confidence_score    FLOAT
+additives           JSONB            -- ["E150D", ...]; NULL vs [] are different claims
+nova_group          SMALLINT
+nutriscore_grade    VARCHAR(20)      -- e.g. "d", or "not-applicable"
+is_vegan            BOOLEAN          -- tri-state: NULL is "unknown", never "no"
+is_vegetarian       BOOLEAN
+is_palm_oil_free    BOOLEAN
+category            TEXT             -- most specific categories_tags entry
+allergens_tags      JSONB
+traces_tags         JSONB
+labels_tags         JSONB
+categories_tags     JSONB
+nutrient_levels     JSONB
+serving_size        TEXT
+serving_quantity    DOUBLE PRECISION
+quantity            TEXT             -- net weight as printed
+nutriscore_score    INT
+ecoscore_grade      VARCHAR(20)
+completeness        REAL
+off_synced_at       TIMESTAMPTZ      -- NULL on rows we sourced ourselves
+off_last_modified   BIGINT           -- Open Food Facts' own last-edited stamp, at sync time
+lookup_count        INT NOT NULL DEFAULT 0
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Notes that matter when querying:
+
+- **`nutrition_facts`** carries the same thirteen keys always — `energy_kcal`,
+  `protein`, `carbs`, `fat`, `saturated_fat`, `trans_fat`, `fiber`, `sugar`,
+  `sodium`, `cholesterol`, `potassium`, `calcium`, `iron` — per 100 g, with
+  `sodium` in grams (Open Food Facts' convention). A key that couldn't be
+  found is `null` rather than omitted, so a client can tell "the source
+  doesn't publish this" from "we failed to map it."
+- **`additives`** / **`is_vegan`** / **`is_vegetarian`** / **`is_palm_oil_free`**
+  are genuinely tri-state. `NULL` means unknown and must never be collapsed
+  to `false`.
+- **`category`** is what [same-shelf alternatives](/docs/backend/api-reference/products#same-shelf-alternatives)
+  match on. Rows without one are excluded from that feature rather than
+  matched loosely.
+- **`lookup_count`** increments on every resolved look-up, asynchronously
+  so it never sits on the scan path. It ranks `/products/trending` and
+  breaks ties in search.
+
+## `users`
+
+One row per **device**, not per person — see [Authentication](/docs/backend/authentication).
+
+```sql
+device_id            VARCHAR(128) PRIMARY KEY   -- server-generated, never client-supplied
+country              VARCHAR(2) NOT NULL DEFAULT 'IN'
+dietary_preferences  JSONB NOT NULL DEFAULT '[]'
+plus_since           TIMESTAMPTZ
+plus_expires_at      TIMESTAMPTZ      -- NULL while plus_since is set = "on, no expiry" (the free period)
+plus_source          VARCHAR(20)      -- "complimentary" today; "paid" reserved for real payments
+apple_user_id        VARCHAR(255)     -- Sign in with Apple `sub`, UNIQUE where not null
+email                VARCHAR(320)
+display_name         VARCHAR(120)
+linked_at            TIMESTAMPTZ
+token_hash           CHAR(64)         -- SHA-256 of the bearer token, UNIQUE where not null
+token_issued_at      TIMESTAMPTZ
+created_at           TIMESTAMPTZ
+updated_at           TIMESTAMPTZ
+```
+
+## `verifications`
+
+```sql
+id           UUID PRIMARY KEY
+product_id   UUID REFERENCES products(id) ON DELETE CASCADE
+barcode      VARCHAR(20)
+country      VARCHAR(2)
+device_id    VARCHAR(255)
+verified     BOOLEAN NOT NULL
+created_at   TIMESTAMPTZ
+```
+
+## `ocr_submissions`
+
+```sql
+id                  UUID PRIMARY KEY
+barcode             VARCHAR(20)
+country              VARCHAR(2)
+image_url            TEXT              -- nullable; no image is actually stored today
+extracted_text       TEXT NOT NULL     -- the untouched on-device OCR output
+parsed_nutrition     JSONB
+confidence_score     FLOAT
+status               VARCHAR(50) DEFAULT 'pending_verification'
+                     -- pending_verification | flagged_low_confidence | flagged_allergen_mismatch
+final_product_id     UUID REFERENCES products(id) ON DELETE SET NULL
+device_id            VARCHAR(128)
+created_at / updated_at   TIMESTAMPTZ
+```
+
+## Indexes
+
+```sql
+-- products
+CREATE UNIQUE INDEX ON products(barcode);
+CREATE INDEX ON products(barcode, country);
+CREATE INDEX ON products(verified);
+CREATE INDEX ON products(category, country);
+CREATE INDEX ON products(country, lookup_count DESC);
+CREATE INDEX ON products USING gin (product_name gin_trgm_ops);
+CREATE INDEX ON products USING gin (brand gin_trgm_ops);
+CREATE INDEX ON products USING gin (labels_tags);
+CREATE INDEX ON products(off_synced_at) WHERE source = 'open_food_facts';
+
+-- verifications
+CREATE INDEX ON verifications(product_id);
+CREATE INDEX ON verifications(barcode, country);
+CREATE INDEX ON verifications(device_id) WHERE device_id IS NOT NULL;
+
+-- ocr_submissions
+CREATE INDEX ON ocr_submissions(barcode);
+CREATE INDEX ON ocr_submissions(status);
+CREATE INDEX ON ocr_submissions(device_id) WHERE device_id IS NOT NULL;
+
+-- users
+CREATE INDEX ON users(plus_since) WHERE plus_since IS NOT NULL;
+CREATE UNIQUE INDEX ON users(apple_user_id) WHERE apple_user_id IS NOT NULL;
+CREATE UNIQUE INDEX ON users(token_hash) WHERE token_hash IS NOT NULL;
+```
+
+The trigram (`gin_trgm_ops`) indexes need the `pg_trgm` extension, created
+by the search migration (`CREATE EXTENSION IF NOT EXISTS pg_trgm`). On a
+managed Postgres, the role running migrations needs permission to create
+extensions — every major provider allows `pg_trgm` by default.
+
+<Callout type="info" title="No legacy-row concern">
+  A migration deleted every pre-token-era `users` row
+  (`WHERE token_hash IS NULL`) when the auth system landed. If you're
+  reading this schema fresh, there's nothing from before device tokens
+  existed to account for.
+</Callout>

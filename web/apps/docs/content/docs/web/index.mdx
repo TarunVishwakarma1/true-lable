@@ -1,0 +1,72 @@
+---
+title: Web Workspace
+description: Turborepo (bun) — the marketing site, this docs site, and the shared design system.
+---
+
+```
+web/
+├── apps/
+│   ├── web/     Marketing/landing site (Next.js) — localhost:3000
+│   └── docs/     This docs site (Next.js + Fumadocs) — localhost:3001
+├── packages/
+│   ├── ui/        Shared design tokens + components — @repo/ui
+│   ├── eslint-config/
+│   └── typescript-config/
+├── turbo.json
+├── package.json     workspaces: ["apps/*", "packages/*"]
+└── bun.lock
+```
+
+Package manager: **bun 1.3.8** (`devEngines.packageManager` in the root
+`package.json`). All scripts delegate through Turborepo:
+
+```bash
+bun install
+bun run dev              # every app, in parallel
+bun run dev --filter=web    # just the marketing site
+bun run dev --filter=docs    # just this docs site
+bun run build
+bun run lint
+bun run check-types
+```
+
+## `@repo/ui`
+
+The design-token package both `apps/web` and `apps/docs` build on —
+exported as `"./*": "./src/*.tsx"` plus `"./styles.css"`, so any file under
+`packages/ui/src` is importable as `@repo/ui/<name>`.
+
+Design tokens (`styles.css`) — warm-paper light mode, near-black dark mode,
+emerald accent, one signature easing curve:
+
+```css
+--bg: #f3f0e8;      /* light */
+--fg: #171612;
+--accent: #10b981;
+--warn: #f59e0b;
+--ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+```
+
+Component/utility inventory (`packages/ui/src/`): `barcode-canvas`,
+`button`, `container`, `count-up`, `cursor`, `hold`, `label-card`,
+`marquee`, `parallax`, `preloader`, `providers`, `reveal`, `scan-demo`,
+`scroll-progress`, `section-heading`, `smooth-scroll`, `sound`,
+`theme-boot`, `theme-toggle`, `theme`, `typewriter`, `use-media`,
+`use-pointer`, plus a `three.js` scene system under `scene/`
+(`barcode-scene`, `particles-scene`, `resume`) for the marketing site's 3D
+elements (`@react-three/fiber`, `@react-three/drei`,
+`@react-three/postprocessing`).
+
+<Callout type="info" title="This docs site reuses the same tokens, deliberately">
+  `apps/docs` maps Fumadocs' own `--color-fd-*` variables onto
+  `@repo/ui`'s tokens rather than using a framework default palette — see
+  `apps/docs/app/globals.css`. A docs site skinned with a generic theme
+  reads as bolted-on rather than part of the product.
+</Callout>
+
+## Adding a new app
+
+Follow `apps/web`/`apps/docs`'s existing shape exactly — same script names
+(`dev`/`build`/`start`/`lint`/`check-types`), same `@repo/eslint-config` /
+`@repo/typescript-config` references — so it slots into `turbo.json`'s
+existing task graph with no changes needed there.

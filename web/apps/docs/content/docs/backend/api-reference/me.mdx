@@ -1,0 +1,104 @@
+---
+title: Profile & Account
+description: Profile, stats, subscription, and Sign in with Apple.
+---
+
+Every `/api/v1/me/*` endpoint **requires auth** and takes no device id
+anywhere — see [Authentication](/docs/backend/authentication). Rate limits
+noted per endpoint are per device.
+
+## Profile
+
+`GET /api/v1/me/profile` — no rate limit beyond the global backstop
+
+There are no accounts by default — the device token is the identity, and
+**reading a profile creates it** if it doesn't exist yet. There's no
+separate registration step for `/me/*` beyond `POST /api/v1/auth/device`.
+
+```json
+{
+  "device_id": "9B1D6F20-80E2-47DB-9D9B-FDF6ECFA8B85",
+  "country": "IN",
+  "dietary_preferences": ["Vegetarian", "Low sugar"],
+  "subscription": { "tier": "plus", "active": true, "since": "2026-09-13T10:00:00Z", "expires_at": null, "source": "complimentary" },
+  "identity": { "signed_in": false, "provider": null, "email": null, "display_name": null, "linked_at": null },
+  "created_at": "2026-09-13T09:12:00Z"
+}
+```
+
+`PUT /api/v1/me/profile` — 60/hr
+
+```json
+{ "country": "IN", "dietary_preferences": ["Vegetarian", "Low sugar"], "display_name": "Tarun" }
+```
+
+Every field is optional — absent means "leave it alone", so `country` can
+change without resending the preference list. `display_name` is settable
+here without an account (a name isn't an identity, and it's the only thing
+a client can offer when Sign in with Apple is unavailable to it) — an
+empty string clears it.
+
+The backend doesn't own the preference vocabulary (the iOS app does, and
+it grows — see [iOS: dietary preferences](/docs/ios#dietary-preferences)),
+so entries are stored as given, but trimmed, de-duplicated, and capped at
+32 entries of 64 characters so one client can't write an unbounded blob
+into a shared table.
+
+## Contribution stats
+
+`GET /api/v1/me/stats`
+
+```json
+{ "confirmations": 12, "contributions": 3, "helped_verify": 5, "member_since": "2026-09-13T09:12:00Z" }
+```
+
+Deliberately about **contribution, not consumption** — how much someone
+scans never leaves their phone (it lives in iOS's local `ScanRecord`
+store); what they put into the shared catalogue is the only thing counted
+here. `helped_verify` is the subset of their confirmations sitting on
+products that have since crossed the threshold and are now verified for
+everyone — the number worth actually showing someone. All three come back
+in one round trip.
+
+## Subscription
+
+```
+GET    /api/v1/me/subscription
+POST   /api/v1/me/subscription    — activate
+DELETE /api/v1/me/subscription    — cancel
+```
+
+All 60/hr except `GET`.
+
+```json
+{ "tier": "plus", "active": true, "since": "2026-09-13T10:00:00Z", "expires_at": null, "source": "complimentary" }
+```
+
+<Callout type="info" title="TrueLabel Plus is free right now">
+  `POST` takes no body and asks for nothing — while Plus is complimentary,
+  activating it *is* the whole transaction. It sets `since` and leaves
+  `expires_at` as `null`, meaning *on, with no expiry*; `active` is
+  computed so a missing expiry never reads as lapsed.
+
+  `source` records how the tier was granted — `"complimentary"` today,
+  `"paid"` reserved for real payments. When those exist, `POST` will take a
+  receipt, verify it, and write a real `expires_at`; the response shape
+  won't change, so anything written against this contract today keeps
+  working. The iOS client treats either the backend *or* a StoreKit
+  entitlement as sufficient for Plus, so that switch needs no client
+  change either.
+</Callout>
+
+## Sign in, sign out, delete
+
+See [Authentication → Sign in with Apple](/docs/backend/authentication#sign-in-with-apple)
+for the full verification flow and the "needs a paid dev team" caveat.
+
+```
+POST   /api/v1/me/link     { identity_token, display_name? }   — 60/hr
+POST   /api/v1/me/unlink                                        — no extra limit
+DELETE /api/v1/me/account                                       — no extra limit, deletes the row for real
+```
+
+`email` and `display_name` are written with `COALESCE`, never blanked by a
+later sign-in — Apple hands both over on the **first authorization only**.

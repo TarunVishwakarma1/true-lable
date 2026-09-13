@@ -91,19 +91,23 @@ html {
   mix-blend-mode: normal;
 }
 
-/* Custom cursor: only where a fine pointer exists. */
+/* Custom cursor: only where a fine pointer exists, and only on pages that
+   actually mount <Cursor> — otherwise this hides the OS pointer with
+   nothing drawn in its place. */
 .cursor {
   display: none;
 }
 @media (hover: hover) and (pointer: fine) {
-  .cursor {
+  body:has(.cursor) {
+    cursor: none;
+  }
+  body:has(.cursor) .cursor {
     display: block;
   }
-  body,
-  a,
-  button,
-  input,
-  canvas {
+  body:has(.cursor) a,
+  body:has(.cursor) button,
+  body:has(.cursor) input,
+  body:has(.cursor) canvas {
     cursor: none;
   }
 }

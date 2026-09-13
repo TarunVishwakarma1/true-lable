@@ -1,0 +1,83 @@
+---
+title: Contributing
+description: Branches, pull requests, and what to check before opening one.
+---
+
+## Branches
+
+Four long-lived branches: **`main`**, **`test`**, **`sit`**, **`dev`**.
+`dev` is for active development; everything else branches off one of these
+four and merges back via PR. Only `main` is deployed (see
+[Deployment](/docs/deployment)) — pushes to the other three build and
+publish Docker images (tagged with the branch name; `latest` always points
+at whichever branch published most recently) without deploying anywhere.
+
+## Before opening a PR
+
+<Steps>
+<Step>
+
+**Backend changes** — run the test suite:
+
+```bash
+cd backend && cargo test
+```
+
+If you touched a route, [API Reference](/docs/backend/api-reference/products)
+needs the matching update in the same PR — this repo tries hard to keep
+docs and code from drifting apart; see the note at the top of
+[Architecture](/docs/architecture).
+
+</Step>
+<Step>
+
+**iOS changes** — build for testing (don't launch the Simulator just to
+verify a compile):
+
+```bash
+cd ios/truelable
+xcodebuild -scheme truelable -destination 'platform=iOS Simulator,name=<device>' build-for-testing
+```
+
+If you added or changed a backend call, update `Core/APIClient.swift` and
+the corresponding page under [iOS → Networking](/docs/ios/networking) in
+the same PR.
+
+</Step>
+<Step>
+
+**Web changes** — from `web/`:
+
+```bash
+bun run lint
+bun run check-types
+bun run build
+```
+
+</Step>
+</Steps>
+
+## Opening issues
+
+Use the template that matches what you're reporting — bug, feature
+request, or chore — from the issue picker. Each asks for exactly what's
+needed to act on it; skipping sections usually just means someone has to
+ask the same question back before anything can move.
+
+## Pull requests
+
+Fill in the PR template's test plan honestly — "not tested" is a valid
+answer if that's true, a fabricated checklist is worse than no checklist.
+Link the issue it closes if there is one.
+
+## Style, broadly
+
+- **Rust**: comments explain *why*, not *what* — the code already says
+  what it does. See any file under `backend/src/services/` for the house
+  style.
+- **Swift**: no third-party dependencies without discussing it first —
+  the app is intentionally built against Apple's own frameworks only.
+- **Never fabricate data in the UI.** If a number isn't real (not
+  computed, not from the API, not from local storage), don't show it — an
+  honest "not enough data yet" beats a plausible-looking placeholder. This
+  shows up throughout the codebase; keep it up.

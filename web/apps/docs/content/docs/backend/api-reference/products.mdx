@@ -1,0 +1,162 @@
+---
+title: Products
+description: Search, lookup, trending, alternatives, and verification.
+---
+
+`country` is a 2-letter code everywhere and defaults to `IN`.
+
+## Look up a product by barcode
+
+`GET /api/v1/products/search?barcode=<8–14 digits>&country=IN`
+
+No auth required. Resolution order: Redis (1h TTL) → Postgres → Open Food
+Facts (rate-limited to 12 req/min across the whole service). A product
+fetched from Open Food Facts is written to Postgres before it's returned,
+so the next look-up is local. A barcode Open Food Facts doesn't have either
+is remembered as a miss for 10 minutes. Every resolved look-up increments
+`products.lookup_count`.
+
+**Staying in step with Open Food Facts.** Our row is a cache of theirs, not
+a fork — a read of an OFF-sourced row whose `off_synced_at` is 30+ days old
+kicks off a background refresh (opportunistic: skipped rather than queued
+if the per-minute budget has no free slot, since a refresh is never as
+urgent as a live scan). A refresh only rewrites the columns Open Food Facts
+owns — `verified`, `verification_count`, and `lookup_count` are ours and
+are never overwritten; a `user_contributed` row is never touched at all.
+
+```json title="Response"
+{
+  "status": "success",
+  "cached": false,
+  "data": {
+    "id": "b18b6250-9d04-4cc4-9c09-a1b9ceec848a",
+    "barcode": "8901030895564",
+    "country": "IN",
+    "product_name": "Aloo Bhujia",
+    "brand": "Haldiram's",
+    "image_url": "https://images.openfoodfacts.org/…/front.jpg",
+    "nutrition_facts": {
+      "energy_kcal": 546, "protein": 9.2, "carbs": 43.8, "fat": 36.4,
+      "saturated_fat": 12.1, "trans_fat": 0, "fiber": 3,
+      "sugar": 2.4, "sodium": 1.18, "cholesterol": null,
+      "potassium": null, "calcium": null, "iron": null
+    },
+    "nutrition_per_serving": { "energy_kcal": 163.8, "sugar": 0.72 },
+    "nutrient_levels": { "fat": "high", "saturated_fat": "high", "sugar": "low", "sodium": "high" },
+    "serving_size": "30 g",
+    "quantity": "200 g",
+    "ingredients": "Gram flour, edible vegetable oil (palm), potato, salt…",
+    "allergens": ["peanuts"],
+    "traces": ["tree-nuts"],
+    "labels": ["vegetarian", "no-added-sugar"],
+    "additives": ["E330", "E500II"],
+    "categories": ["snacks", "salty-snacks", "namkeen"],
+    "source": "open_food_facts",
+    "verified": false,
+    "verification_count": 1,
+    "nova_group": 4,
+    "nutriscore_grade": "d",
+    "is_vegan": true,
+    "is_vegetarian": true,
+    "is_palm_oil_free": false,
+    "category": "namkeen"
+  }
+}
+```
+
+Everything in `nutrition_facts` is **per 100 g**, and `sodium` is in
+**grams** (Open Food Facts' convention), not milligrams.
+`nutrition_per_serving` is the same document scaled by `serving_quantity`
+— arithmetic only, absent rather than guessed when the pack states no
+serving size.
+
+`nutrient_levels` is `low` / `moderate` / `high` per nutrient — Open Food
+Facts' own where they publish one, the UK FSA front-of-pack thresholds
+otherwise (with the separate drinks thresholds applied when the product is
+a beverage).
+
+<Callout type="info" title="Three-valued fields, throughout">
+  Dietary flags, `allergens`, `traces`, `labels`, `additives`, and
+  `categories` are `null` when the source publishes nothing and `[]` /
+  `false` when it publishes "none" — different claims about food that must
+  never be collapsed into each other. `traces` (the "may contain" line) is
+  kept apart from `allergens` on purpose: for an allergy it's often the
+  line that actually decides it.
+</Callout>
+
+Tags travel as slugs with the locale prefix stripped (`"tree-nuts"`, not
+`"en:tree-nuts"`) — matchable and prettifiable, never a display string
+that can only be shown. Nutrient figures are sanity-checked before
+storage: negative, above 100g/100g, or above 900 kcal/100g values are
+dropped rather than stored (Open Food Facts is crowd-edited and does
+contain data-entry errors).
+
+## Search by name or brand
+
+`GET /api/v1/products/query?q=<2–60 chars>&country=IN&limit=20`
+
+Local catalogue first, ranked by trigram similarity against `product_name`
+and `brand`, then by popularity. When fewer than five local rows match, the
+list tops up from Open Food Facts' own search (its own 8 req/min budget,
+**skipped rather than queued** when spent — a thin result beats a slow
+one). Cached for 10 minutes.
+
+Returns an array of product cards:
+
+```json
+{
+  "barcode": "8901030895564",
+  "product_name": "Aloo Bhujia",
+  "brand": "Haldiram's",
+  "image_url": "https://…/front.jpg",
+  "nutriscore_grade": "d",
+  "nova_group": 4,
+  "verified": false,
+  "energy_kcal": 546,
+  "sugar": 2.4,
+  "sodium": 1.18
+}
+```
+
+## Trending products
+
+`GET /api/v1/products/trending?country=IN&limit=10`
+
+The same card shape, ordered by `lookup_count`, then verification count,
+then recency — so a freshly seeded database still returns something.
+Products still named `Unknown` are excluded.
+
+## Same-shelf alternatives
+
+`GET /api/v1/products/alternatives?barcode=…&country=IN&sort_by=sugar&limit=3`
+
+Products sharing the scanned product's `category`, ranked on one nutrient.
+`sort_by` accepts `sugar`, `sodium`, `fat`, `saturated_fat`, `energy_kcal`,
+`carbs` (ascending — less is better), `protein`, `fiber` (descending —
+more is better), or `score` (Nutri-Score then NOVA). `limit` is clamped to
+1–10.
+
+Returns product cards with an extra `sort_value` (the ranked nutrient's
+per-100g figure). A product with no `category` returns `[]` — an unmatched
+shelf beats a wrong one.
+
+## Verification queue
+
+`GET /api/v1/products/needs-verification?country=IN&limit=12`
+
+Products below the 3-confirmation threshold that this device hasn't
+already voted on. Works without a token — sending one is what lets it skip
+what you've already voted on.
+
+## Confirm a product matches its label
+
+`POST /api/v1/products/verify` · **requires auth**
+
+```json
+{ "barcode": "8901030895564", "country": "IN" }
+```
+
+Who's confirming comes from the token, never from the body. Records a row
+in `verifications`, increments `products.verification_count`, flips
+`verified` to `true` at 3, busts the product's cache entry, and returns
+the refreshed product.

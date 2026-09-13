@@ -1,0 +1,58 @@
+---
+title: Rate Limiting
+description: Redis-backed, fixed-window, fails open.
+---
+
+Counted in Redis, per hour. The subject is the **token** when there is one
+and the **address** otherwise — mobile networks put thousands of people
+behind one address, so limiting everyone by IP would punish a whole carrier
+for one script.
+
+| Bucket | Limit | Subject |
+|---|---|---|
+| Barcode look-up | 600/hr | device or address |
+| Text search | 200/hr | device or address |
+| Confirm a product | 60/hr | device |
+| Submit a label | 20/hr | device |
+| Profile / subscription / link writes | 60/hr | device |
+| Register a device | 10/hr | address |
+| **Global backstop, every route** | 3,000/hr | address |
+
+Over the limit returns `429`. The counter is a fixed window, incremented
+and expired in one Lua call, so a process dying mid-sequence can't leave a
+key without a TTL and jam a subject out permanently.
+
+<Callout type="info" title="Fails open">
+  If Redis is unreachable, the request is allowed through and the failure
+  is logged. This limiter exists to blunt abuse — taking the whole API down
+  because the cache blinked is the worse outcome.
+</Callout>
+
+The global 3,000/hr-per-address backstop covers every route, including ones
+added later, so a flood at an endpoint nobody remembered to protect still
+costs something. `/health*` is exempt — limiting health checks would pull
+the service out of rotation under exactly the load the limit exists for.
+
+## `TRUSTED_PROXY_HOPS`
+
+`X-Forwarded-For` is a list each proxy *appends* to — everything to the
+left of what your own proxies added was written by the caller. Reading the
+leftmost entry (the obvious thing to do) means a client sends
+`X-Forwarded-For: <anything>` and picks a fresh rate-limit bucket on every
+request.
+
+`TRUSTED_PROXY_HOPS` is the number of proxies in front of this process. The
+real client is the entry that many places from the *right* — the address
+the outermost trusted proxy actually observed.
+
+<Callout type="warn" title="Get this exactly right">
+  It defaults to `0`, which ignores the header entirely and uses the
+  socket's peer address (unforgeable). Count only hops that actually
+  *append* to the header: `nginx` alone in front is `1`; a CDN in front of
+  that is `2`; an L4/TCP load balancer doesn't append and doesn't count.
+  **Setting it higher than the truth is worse than leaving it at 0** — the
+  surplus entries are attacker-supplied, and you'd be trusting them.
+</Callout>
+
+See [Deployment](/docs/deployment) for the real value this is set to in
+production, and why.
