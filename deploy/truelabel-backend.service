@@ -1,0 +1,57 @@
+# /etc/systemd/system/truelabel-backend.service
+#
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin truelabel
+#   sudo install -m 0755 truelabel-backend /usr/local/bin/
+#   sudo install -d -m 0750 -o root -g truelabel /etc/truelabel
+#   sudo install -m 0640 -o root -g truelabel backend.env /etc/truelabel/backend.env
+#   sudo systemctl daemon-reload && sudo systemctl enable --now truelabel-backend
+
+[Unit]
+Description=TrueLabel API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=truelabel
+Group=truelabel
+
+# The database URL carries a password, so it lives in a root-owned file the
+# service group can read, not in this unit and not in a .env beside the
+# binary where a deploy could world-read it.
+EnvironmentFile=/etc/truelabel/backend.env
+ExecStart=/usr/local/bin/truelabel-backend
+
+Restart=always
+RestartSec=2s
+
+# This process needs a socket, a database and nothing else. Everything below
+# takes away something it never uses, so a bug that would otherwise become a
+# foothold has nowhere to go.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
