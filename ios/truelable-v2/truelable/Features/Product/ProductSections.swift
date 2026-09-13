@@ -15,7 +15,7 @@ struct VerdictCard: View {
     var body: some View {
         if let score = product.healthScore, let verdict = product.verdict {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 18) {
+                HStack(spacing: 20) {
                     ScoreRing(score: score, color: color(verdict.tone))
                     VStack(alignment: .leading, spacing: 8) {
                         Text(verdict.headline)
@@ -33,13 +33,13 @@ struct VerdictCard: View {
                     .font(.caption2)
                     .foregroundStyle(TL.fg3)
             }
-            .card()
+            .card(.hero)
         } else {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: "questionmark.circle")
                     .font(.title2)
                     .foregroundStyle(TL.fg3)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("No overall score yet")
                         .font(.subheadline.weight(.semibold))
                     Text("The source hasn't graded this product. The numbers below are still real.")
@@ -47,13 +47,13 @@ struct VerdictCard: View {
                         .foregroundStyle(TL.fg2)
                 }
             }
-            .card(padding: 16)
+            .card(.flat)
         }
     }
 
     private func color(_ tone: Tone) -> Color {
         switch tone {
-        case .good: TL.accent
+        case .good: TL.good
         case .fair: TL.warn
         case .poor: TL.danger
         }
@@ -68,7 +68,7 @@ struct ForYouCard: View {
     private var worst: PersonalCheck.Status { checks.first?.status ?? .good }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 SectionHeader(title: "For you")
                 Image(systemName: worst.icon)
@@ -76,7 +76,7 @@ struct ForYouCard: View {
             }
             VStack(spacing: 0) {
                 ForEach(Array(checks.enumerated()), id: \.element.id) { i, check in
-                    if i > 0 { Divider().overlay(TL.line) }
+                    if i > 0 { Hairline() }
                     HStack(spacing: 12) {
                         Image(systemName: check.status.icon)
                             .font(.body)
@@ -113,18 +113,18 @@ struct MacroCard: View {
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(product.calories.map { "\($0)" } ?? "—")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .monospacedDigit()
+                        .font(.displayXL)
+                        .numeric()
                     Text("kcal / 100 g")
                         .font(.caption)
                         .foregroundStyle(TL.fg3)
                 }
                 .frame(minWidth: 96, alignment: .leading)
 
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     if let fat = n.fat { bar("Fat", fat, TL.warn) }
-                    if let carbs = n.carbs { bar("Carbs", carbs, TL.accent) }
-                    if let protein = n.protein { bar("Protein", protein, TL.info) }
+                    if let carbs = n.carbs { bar("Carbs", carbs, TL.info) }
+                    if let protein = n.protein { bar("Protein", protein, TL.violet) }
                 }
             }
             .card()
@@ -132,11 +132,11 @@ struct MacroCard: View {
     }
 
     private func bar(_ label: String, _ grams: Double, _ color: Color) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             HStack {
                 Text(label).font(.caption.weight(.medium)).foregroundStyle(TL.fg2)
                 Spacer()
-                Text("\(grams.compact) g").font(.caption.weight(.semibold)).monospacedDigit()
+                Text("\(grams.compact) g").font(.caption.weight(.semibold)).numeric()
             }
             BarMeter(fraction: grams / maxMacro, color: color, height: 5)
         }
@@ -152,7 +152,7 @@ struct SugarCard: View {
     private var teaspoons: Int { max(1, Int((sugarGrams / 4).rounded())) }
     private var percentOfDay: Int { Int((sugarGrams / 50 * 100).rounded()) }
     private var tint: Color {
-        sugarGrams >= Threshold.sugarHigh ? TL.danger : sugarGrams <= Threshold.sugarLow ? TL.accent : TL.warn
+        sugarGrams >= Threshold.sugarHigh ? TL.danger : sugarGrams <= Threshold.sugarLow ? TL.good : TL.warn
     }
 
     var body: some View {
@@ -161,10 +161,10 @@ struct SugarCard: View {
                 SectionHeader(title: "Sugar")
                 Text("\(sugarGrams.compact) g / 100 g")
                     .font(.footnote.weight(.semibold))
-                    .monospacedDigit()
+                    .numeric()
                     .foregroundStyle(tint)
             }
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 ForEach(0..<min(teaspoons, 12), id: \.self) { _ in
                     Image(systemName: "cube.fill")
                         .font(.title3)
@@ -207,7 +207,7 @@ struct LabelCard: View {
                     Spacer()
                     Text(product.calories.map { "\($0)" } ?? "—")
                         .font(.system(size: 30, weight: .black, design: .rounded))
-                        .monospacedDigit()
+                        .numeric()
                         .foregroundStyle(TL.paperInk)
                 }
                 Rectangle().fill(TL.paperInk).frame(height: 3).padding(.vertical, 6)
@@ -218,7 +218,7 @@ struct LabelCard: View {
                         Text(row.name)
                             .font(.subheadline.weight(row.name.hasPrefix("Total") || row.name == "Protein" || row.name == "Sodium" ? .bold : .regular))
                         Spacer()
-                        Text(row.value).font(.subheadline).monospacedDigit()
+                        Text(row.value).font(.subheadline).numeric()
                     }
                     .foregroundStyle(TL.paperInk)
                     .padding(.leading, row.name.hasPrefix("Total") || row.name == "Protein" || row.name == "Sodium" || row.name == "Cholesterol" ? 0 : 14)
@@ -230,7 +230,7 @@ struct LabelCard: View {
             .padding(18)
         }
         .background(TL.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
         .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
         .padding(.vertical, 6)
     }
@@ -258,7 +258,7 @@ struct IngredientsCard: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Ingredients")
             Text(text)
                 .font(.subheadline)
@@ -284,7 +284,7 @@ struct AdditivesCard: View {
             SectionHeader(title: "Additives", detail: "\(codes.count)")
             VStack(spacing: 0) {
                 ForEach(Array(codes.enumerated()), id: \.offset) { i, code in
-                    if i > 0 { Divider().overlay(TL.line) }
+                    if i > 0 { Hairline() }
                     HStack {
                         Text(code)
                             .font(.subheadline.weight(.bold).monospaced())
@@ -306,29 +306,45 @@ struct AdditivesCard: View {
 }
 
 struct AllergensCard: View {
-    let raw: String
+    var allergens: [String]
+    var traces: [String]
 
-    /// OFF tags look like "en:milk,en:tree-nuts" — strip the locale prefix
-    /// and hyphens before showing them to a person.
-    private var items: [String] {
-        raw.split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .map { item -> String in
-                let noPrefix = item.split(separator: ":", maxSplits: 1).last.map(String.init) ?? item
-                return noPrefix.replacingOccurrences(of: "-", with: " ").capitalized
-            }
-            .filter { !$0.isEmpty && $0.lowercased() != "none" }
+    /// Source slugs are `"tree-nuts"`, `"en"`-stripped upstream. This only
+    /// makes them readable.
+    private func label(_ slug: String) -> String {
+        slug.replacingOccurrences(of: "-", with: " ").capitalized
     }
 
+    private var declared: [String] { allergens.filter { $0 != "none" } }
+
     var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+        if !declared.isEmpty || !traces.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     SectionHeader(title: "Allergens")
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(TL.warn)
                 }
-                FlowLayout(spacing: 8) {
-                    ForEach(items, id: \.self) { Pill(text: $0, color: TL.warn) }
+
+                if !declared.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("CONTAINS")
+                            .font(.caption2.weight(.bold)).tracking(1).foregroundStyle(TL.danger)
+                        FlowLayout(spacing: 8) {
+                            ForEach(declared, id: \.self) { Pill(text: label($0), color: TL.danger) }
+                        }
+                    }
+                }
+
+                // Separate on purpose: for an allergy this is often the line
+                // that decides it, and burying it with the ingredients hides it.
+                if !traces.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MAY CONTAIN")
+                            .font(.caption2.weight(.bold)).tracking(1).foregroundStyle(TL.warn)
+                        FlowLayout(spacing: 8) {
+                            ForEach(traces, id: \.self) { Pill(text: label($0), color: TL.warn) }
+                        }
+                    }
                 }
             }
             .card(fill: Color(hex: 0x231A10))
@@ -379,7 +395,7 @@ struct AlternativesCard: View {
                 }
                 VStack(spacing: 0) {
                     ForEach(Array(alternatives.enumerated()), id: \.element.id) { i, alt in
-                        if i > 0 { Divider().overlay(TL.line) }
+                        if i > 0 { Hairline() }
                         NavigationLink(value: alt.barcode) {
                             ProductCardRow(card: alt, trailing: alt.sortValue.map { "\($0.compact) \(unit)" })
                                 .padding(.vertical, 10)
@@ -426,7 +442,7 @@ struct CommunityCard: View {
     private var remaining: Int { max(0, 3 - product.verificationCount) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: product.verified ? "checkmark.seal.fill" : "person.2.fill")
                     .font(.title3)

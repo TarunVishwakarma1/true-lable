@@ -142,18 +142,18 @@ struct HistoryView: View {
     }
 
     private func rowBody(_ record: ScanRecord) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             if compareMode {
                 Image(systemName: selected.contains(record.barcode) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundStyle(selected.contains(record.barcode) ? TL.accent : TL.fg3)
             }
             ProductThumb(url: record.imageURL, size: 56, radius: 16)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(record.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if !record.brand.isEmpty {
                         Text(record.brand).lineLimit(1)
                     }
@@ -176,7 +176,7 @@ struct HistoryView: View {
     }
 
     private var compareBar: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             if !plus.isActive && selected.count >= compareLimit {
                 PlusGate(text: "Compare up to four with Plus")
             }
@@ -196,7 +196,7 @@ struct HistoryView: View {
     }
 
     private var empty: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             ContentUnavailableView(
                 "Nothing scanned yet",
                 systemImage: "clock",

@@ -29,8 +29,11 @@ struct RootView: View {
         .fullScreenCover(isPresented: $router.scannerPresented) {
             ScanScreen()
         }
-        .sheet(isPresented: $router.manualEntryPresented) {
-            ManualEntrySheet()
+        .sheet(item: $router.sheet) { sheet in
+            switch sheet {
+            case .manualEntry: ManualEntrySheet()
+            case .search: SearchSheet()
+            }
         }
         .task {
             // Adopt the saved profile only when this device has none of its
@@ -76,7 +79,7 @@ private struct ScanAccessory: View {
         Button {
             router.scannerPresented = true
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: showQR ? "qrcode" : "barcode")
                     .contentTransition(.symbolEffect(.replace))
                 Text(placement == .inline ? "Scan" : "Scan a product")

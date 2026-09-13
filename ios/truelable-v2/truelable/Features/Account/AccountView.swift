@@ -63,13 +63,13 @@ struct AccountView: View {
     // MARK: Signed out
 
     private var signedOut: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "person.crop.circle.dashed")
                     .font(.system(size: 40))
                     .foregroundStyle(TL.fg3)
                 Text("Keep your profile\nif you change phones.")
-                    .font(.display(28))
+                    .font(.displayM)
                     .tracking(-0.5)
                 Text("Everything works without an account. Signing in only means your preferences and Plus come back on a new phone instead of starting over.")
                     .font(.subheadline)
@@ -117,7 +117,7 @@ struct AccountView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(TL.fg3)
                 Text("What should we\ncall you?")
-                    .font(.display(28))
+                    .font(.displayM)
                     .tracking(-0.5)
                 Text("Optional, and it's the only thing we'd know about you. Everything else in the app works without it.")
                     .font(.subheadline)
@@ -162,18 +162,18 @@ struct AccountView: View {
     // MARK: Signed in
 
     private var signedIn: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 16) {
                 Image(systemName: "person.crop.circle.fill.badge.checkmark")
                     .font(.system(size: 34))
                     .foregroundStyle(TL.accent)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(account.label)
                         .font(.headline)
                         .lineLimit(1)
                     Text(plus.isActive ? "TrueLabel Plus is on" : "Free plan")
                         .font(.footnote)
-                        .foregroundStyle(plus.isActive ? TL.accent : TL.fg3)
+                        .foregroundStyle(plus.isActive ? TL.brass : TL.fg3)
                 }
                 Spacer()
             }
@@ -184,7 +184,7 @@ struct AccountView: View {
             row("Preferences", DietaryPreference.decode(dietaryRaw).isEmpty
                 ? "None set" : "\(DietaryPreference.decode(dietaryRaw).count) saved")
 
-            Divider().overlay(TL.line)
+            Hairline()
 
             Button("Sign out") { Task { await account.signOut() } }
                 .buttonStyle(.secondary)
@@ -250,13 +250,13 @@ struct AccountCard: View {
 
     var body: some View {
         Button { showing = true } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: account.signedIn ? "person.crop.circle.fill" : "person.crop.circle.dashed")
                     .font(.title2)
                     .foregroundStyle(account.signedIn ? TL.accent : TL.fg3)
                     .frame(width: 44, height: 44)
                     .background((account.signedIn ? TL.accent : TL.fg3).opacity(0.14),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(account.signedIn
                      ? account.label
@@ -275,7 +275,7 @@ struct AccountCard: View {
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
             }
-            .card(radius: 20, padding: 14)
+            .card(.flat)
         }
         .buttonStyle(.pressable)
         .sheet(isPresented: $showing) { AccountView() }

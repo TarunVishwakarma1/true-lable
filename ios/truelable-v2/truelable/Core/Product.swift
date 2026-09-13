@@ -23,8 +23,27 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
     var verificationCount: Int
     let nutrition: Nutrition
     let ingredients: String?
-    let allergens: String?
+    /// Slugs as the source publishes them: `"peanuts"`, `"gluten"`. `nil`
+    /// means the source doesn't publish allergens at all, `[]` means it
+    /// publishes "none" — never treat the first as the second.
+    let allergens: [String]?
+    /// "May contain". A trace is not an ingredient, and for an allergy it is
+    /// the line that matters most.
+    let traces: [String]?
+    /// Certifications: `"gluten-free"`, `"organic"`, `"vegan"`.
+    let labels: [String]?
     let additives: [String]
+    let quantity: String?
+    let servingSize: String?
+    let servingQuantity: Double?
+    /// The same figures scaled to one serving, computed server-side from the
+    /// serving quantity. Absent when the pack doesn't state one.
+    let nutritionPerServing: Nutrition?
+    /// `["sugar": "high", ...]` — the source's own traffic light where it
+    /// publishes one, the FSA thresholds where it doesn't.
+    let nutrientLevels: [String: String]?
+    let nutriscoreScore: Int?
+    let ecoscoreGrade: String?
     let novaGroup: Int?
     let nutriscoreGrade: String?
     /// Tri-state: `nil` is "source doesn't know", never "no".
@@ -39,7 +58,10 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
         case imageURL = "imageUrl"
         case category, source, verified, verificationCount
         case nutrition = "nutritionFacts"
-        case ingredients, allergens, additives, novaGroup, nutriscoreGrade
+        case nutritionPerServing, nutrientLevels
+        case ingredients, allergens, traces, labels, additives
+        case quantity, servingSize, servingQuantity
+        case novaGroup, nutriscoreGrade, nutriscoreScore, ecoscoreGrade
         case isVegan, isVegetarian, isPalmOilFree
     }
 
@@ -55,8 +77,17 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
         verificationCount = try c.decodeIfPresent(Int.self, forKey: .verificationCount) ?? 0
         nutrition = try c.decodeIfPresent(Nutrition.self, forKey: .nutrition) ?? Nutrition()
         ingredients = try c.decodeIfPresent(String.self, forKey: .ingredients)?.nilIfBlank
-        allergens = try c.decodeIfPresent(String.self, forKey: .allergens)?.nilIfBlank
+        allergens = try c.decodeIfPresent([String].self, forKey: .allergens)
+        traces = try c.decodeIfPresent([String].self, forKey: .traces)
+        labels = try c.decodeIfPresent([String].self, forKey: .labels)
         additives = try c.decodeIfPresent([String].self, forKey: .additives) ?? []
+        quantity = try c.decodeIfPresent(String.self, forKey: .quantity)?.nilIfBlank
+        servingSize = try c.decodeIfPresent(String.self, forKey: .servingSize)?.nilIfBlank
+        servingQuantity = try c.decodeIfPresent(Double.self, forKey: .servingQuantity)
+        nutritionPerServing = try c.decodeIfPresent(Nutrition.self, forKey: .nutritionPerServing)
+        nutrientLevels = try c.decodeIfPresent([String: String].self, forKey: .nutrientLevels)
+        nutriscoreScore = try c.decodeIfPresent(Int.self, forKey: .nutriscoreScore)
+        ecoscoreGrade = try c.decodeIfPresent(String.self, forKey: .ecoscoreGrade)?.nilIfBlank
         novaGroup = try c.decodeIfPresent(Int.self, forKey: .novaGroup)
         nutriscoreGrade = Nutriscore.letter(try c.decodeIfPresent(String.self, forKey: .nutriscoreGrade))
         isVegan = try c.decodeIfPresent(Bool.self, forKey: .isVegan)
@@ -66,14 +97,22 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
 
     init(barcode: String, name: String, brand: String? = nil, imageURL: URL? = nil, category: String? = nil,
          source: String = "open_food_facts", verified: Bool = false, verificationCount: Int = 0,
-         nutrition: Nutrition = Nutrition(), ingredients: String? = nil, allergens: String? = nil,
-         additives: [String] = [], novaGroup: Int? = nil, nutriscoreGrade: String? = nil,
+         nutrition: Nutrition = Nutrition(), ingredients: String? = nil, allergens: [String]? = nil,
+         traces: [String]? = nil, labels: [String]? = nil,
+         additives: [String] = [], quantity: String? = nil, servingSize: String? = nil,
+         servingQuantity: Double? = nil, nutritionPerServing: Nutrition? = nil,
+         nutrientLevels: [String: String]? = nil, novaGroup: Int? = nil,
+         nutriscoreGrade: String? = nil, nutriscoreScore: Int? = nil, ecoscoreGrade: String? = nil,
          isVegan: Bool? = nil, isVegetarian: Bool? = nil, isPalmOilFree: Bool? = nil) {
         self.barcode = barcode; self.name = name; self.brand = brand; self.imageURL = imageURL
         self.category = category; self.source = source; self.verified = verified
         self.verificationCount = verificationCount; self.nutrition = nutrition
-        self.ingredients = ingredients; self.allergens = allergens; self.additives = additives
+        self.ingredients = ingredients; self.allergens = allergens; self.traces = traces
+        self.labels = labels; self.additives = additives; self.quantity = quantity
+        self.servingSize = servingSize; self.servingQuantity = servingQuantity
+        self.nutritionPerServing = nutritionPerServing; self.nutrientLevels = nutrientLevels
         self.novaGroup = novaGroup; self.nutriscoreGrade = nutriscoreGrade
+        self.nutriscoreScore = nutriscoreScore; self.ecoscoreGrade = ecoscoreGrade
         self.isVegan = isVegan; self.isVegetarian = isVegetarian; self.isPalmOilFree = isPalmOilFree
     }
 
@@ -124,14 +163,19 @@ struct Product: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    /// Lower-cased haystack for ingredient/allergen keyword checks.
+    /// Lower-cased ingredient text, for the fallback checks that run only on
+    /// community products with no structured tags.
     var ingredientText: String {
-        [ingredients, allergens].compactMap { $0 }.joined(separator: " ").lowercased()
+        (ingredients ?? "").lowercased()
     }
+
+    /// Everything the source says is in it, traces included, as slugs.
+    var declaredAllergens: [String] { (allergens ?? []) + (traces ?? []) }
 
     var shareSummary: String {
         var lines = ["\(name)\(brand.map { " · \($0)" } ?? "")"]
         if let grade = nutriscoreGrade { lines.append("Nutri-Score \(grade.uppercased())") }
+        if let serving = servingSize { lines.append("Serving \(serving)") }
         if let nova = novaLabel { lines.append("NOVA \(novaGroup ?? 0) · \(nova)") }
         if let kcal = calories { lines.append("\(kcal) kcal per 100g") }
         if let sugar = nutrition.sugar { lines.append("Sugar \(sugar.compact) g per 100g") }

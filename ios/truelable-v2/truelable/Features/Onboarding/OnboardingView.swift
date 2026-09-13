@@ -25,7 +25,7 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     dots
                     Button(page == 2 ? "Start scanning" : "Continue") {
                         if page == 2 { onFinished() } else { withAnimation(.tl()) { page += 1 } }
@@ -46,7 +46,7 @@ struct OnboardingView: View {
     }
 
     private var dots: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(0..<3, id: \.self) { i in
                 Capsule()
                     .fill(i == page ? TL.accent : Color.white.opacity(0.18))
@@ -63,7 +63,7 @@ struct OnboardingView: View {
                 .frame(height: 96)
                 .padding(.bottom, 44)
             Text("Scan it.\nActually know it.")
-                .font(.display(44))
+                .font(.displayXL)
                 .tracking(-1)
                 .lineSpacing(-4)
             Text("Point at any barcode and see what's really inside — sugar in teaspoons, additives by name, and whether it fits how you eat.")
@@ -79,14 +79,14 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
             Text("Verified by people,\nnot press releases.")
-                .font(.display(36))
+                .font(.displayL)
                 .tracking(-0.8)
             Text("Some data comes from Open Food Facts. Some comes from shoppers who photographed a label. You always see which — and you can confirm what you're holding.")
                 .font(.body)
                 .foregroundStyle(TL.fg2)
                 .padding(.top, 14)
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 trustRow("checkmark.seal.fill", TL.accent, "Verified", "Confirmed against the printed label by 3+ people.")
                 trustRow("person.2.fill", TL.warn, "Community-submitted", "Read from a photo, still collecting confirmations.")
                 trustRow("plus.viewfinder", TL.fg2, "Not in the database", "Nobody's added it yet. You can be the first.")
@@ -98,25 +98,25 @@ struct OnboardingView: View {
     }
 
     private func trustRow(_ icon: String, _ tint: Color, _ title: String, _ body: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(tint)
                 .frame(width: 34, height: 34)
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.subheadline.weight(.semibold))
                 Text(body).font(.footnote).foregroundStyle(TL.fg2)
             }
         }
-        .card(radius: 18, padding: 14)
+        .card(.flat)
     }
 
     private var preferences: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Anything we should\nwatch for?")
-                    .font(.display(36))
+                    .font(.displayL)
                     .tracking(-0.8)
                     .padding(.top, 72)
                 Text("Pick what matters and every scan flags it first. Optional — change it anytime under You.")
@@ -148,7 +148,7 @@ struct DietaryChips: View {
                     if on { set.remove(pref) } else { set.insert(pref) }
                     withAnimation(.tl(0.3)) { raw = DietaryPreference.encode(set) }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: on ? "checkmark" : pref.icon)
                             .font(.caption.weight(.bold))
                         Text(pref.rawValue)

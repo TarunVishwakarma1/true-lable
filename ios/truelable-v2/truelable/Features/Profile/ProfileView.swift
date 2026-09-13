@@ -18,6 +18,7 @@ struct ProfileView: View {
     @State private var confirmClear = false
     @State private var showingPlus = false
     @State private var trendWindow = 7
+    @State private var stats: ContributionStats?
     private let plus = Plus.shared
 
     private var prefs: Set<DietaryPreference> { DietaryPreference.decode(dietaryRaw) }
@@ -27,8 +28,9 @@ struct ProfileView: View {
             ScrollView {
                 GlassEffectContainer(spacing: 24) {
                     VStack(spacing: 24) {
-                        AccountCard()
-                        stats
+                        AccountCard().appear(0)
+                        impact.appear(1)
+                        if !records.isEmpty { whatYouScan }
                         if !records.isEmpty { trends }
                         plusCard
                         watchFor
@@ -47,6 +49,7 @@ struct ProfileView: View {
         .task {
             await Account.shared.refresh()
             await Plus.shared.refresh()
+            stats = try? await API.stats()
         }
         .confirmationDialog("Clear scan history?", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("Clear \(records.count) products", role: .destructive) {
@@ -124,13 +127,13 @@ struct ProfileView: View {
     }
 
     private func gauge(_ label: String, _ value: Double, of guideline: Double, unit: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(label).font(.footnote.weight(.medium))
                 Spacer()
                 Text("\(value.compact) \(unit) · \(Int((value / guideline * 100).rounded()))% of daily")
                     .font(.caption)
-                    .monospacedDigit()
+                    .numeric()
                     .foregroundStyle(TL.fg3)
             }
             BarMeter(fraction: value / guideline, color: color)
@@ -141,12 +144,12 @@ struct ProfileView: View {
         Group {
             if plus.isActive {
                 Button { showingPlus = true } label: {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 16) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.title3)
                             .foregroundStyle(TL.ink)
                             .frame(width: 44, height: 44)
-                            .background(TL.accentGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(TL.plusGradient, in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("TrueLabel Plus is on").font(.subheadline.weight(.semibold))
                             Text("Trends, four-way compare, ranked swaps. Tap to manage.").font(.footnote).foregroundStyle(TL.fg2)
@@ -154,7 +157,7 @@ struct ProfileView: View {
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
                     }
-                    .card(radius: 20, fill: TL.elevated, padding: 14)
+                    .card(.flat, fill: TL.elevated)
                 }
                 .buttonStyle(.pressable)
                 .sheet(isPresented: $showingPlus) { PlusView() }
@@ -164,15 +167,97 @@ struct ProfileView: View {
         }
     }
 
-    private var stats: some View {
-        HStack(spacing: 10) {
-            StatTile(value: "\(records.count)", label: "Products looked up", icon: "barcode")
-            StatTile(value: "\(verifiedCount)", label: "Labels confirmed", icon: "checkmark.seal.fill", tint: TL.warn)
+    private var impact: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SectionHeader(title: "Your part in it")
+            HStack(spacing: 12) {
+                StatTile(value: "\(records.count)", label: "Looked up", icon: "barcode")
+                StatTile(value: "\(stats?.confirmations ?? verifiedCount)",
+                         label: "Confirmed", icon: "checkmark.seal.fill", tint: TL.info)
+                StatTile(value: "\(stats?.contributions ?? 0)", label: "Added", icon: "plus.viewfinder", tint: TL.warn)
+            }
+            if let stats, stats.helpedVerify > 0 {
+                Text("\(stats.helpedVerify) of the products you confirmed are now verified for everyone.")
+                    .font(.footnote)
+                    .foregroundStyle(TL.good)
+            } else {
+                Text("Looking things up is private and stays on this phone. Confirming and adding are the parts that help everyone else.")
+                    .font(.footnote)
+                    .foregroundStyle(TL.fg2)
+            }
         }
     }
 
+    // MARK: What you scan
+
+    private var graded: [(letter: String, count: Int)] {
+        Nutriscore.letters.map { letter in
+            (letter, records.filter { $0.nutriscoreGrade == letter }.count)
+        }
+    }
+
+    private var gradedTotal: Int { graded.reduce(0) { $0 + $1.count } }
+
+    /// The shape of what someone actually buys, which is more use than an
+    /// average, and needs nothing from the server.
+    @ViewBuilder
+    private var whatYouScan: some View {
+        if gradedTotal > 0 {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: "What you scan", detail: "\(gradedTotal) graded")
+
+                // Proportional, so the bar is the distribution rather than a
+                // row of equal blocks. layoutPriority orders who gets space,
+                // it does not divide it.
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        ForEach(graded, id: \.letter) { entry in
+                            if entry.count > 0 {
+                                Rectangle()
+                                    .fill(TL.grade(entry.letter))
+                                    .frame(width: geo.size.width * CGFloat(entry.count) / CGFloat(gradedTotal))
+                            }
+                        }
+                    }
+                }
+                .frame(height: 10)
+                .clipShape(Capsule())
+                .accessibilityElement()
+                .accessibilityLabel(gradeSummary)
+
+                HStack(spacing: 0) {
+                    ForEach(graded, id: \.letter) { entry in
+                        VStack(spacing: 4) {
+                            Text(entry.letter.uppercased())
+                                .font(.caption2.weight(.heavy))
+                                .foregroundStyle(entry.count > 0 ? TL.grade(entry.letter) : TL.fg3)
+                            Text("\(entry.count)")
+                                .font(.footnote.weight(.semibold))
+                                .numeric()
+                                .foregroundStyle(entry.count > 0 ? TL.fg : TL.fg3)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+
+                Text(gradeSummary)
+                    .font(.footnote)
+                    .foregroundStyle(TL.fg2)
+            }
+            .card()
+        }
+    }
+
+    private var gradeSummary: String {
+        guard let top = graded.max(by: { $0.count < $1.count }), top.count > 0 else { return "" }
+        let poor = graded.filter { ["d", "e"].contains($0.letter) }.reduce(0) { $0 + $1.count }
+        let lead = "Mostly \(top.letter.uppercased())."
+        guard poor > 0 else { return lead + " Nothing you scan scores D or E." }
+        return lead + " \(poor) of \(gradedTotal) scored D or E."
+    }
+
     private var watchFor: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             SectionHeader(title: "Watch for", detail: prefs.isEmpty ? "Nothing yet" : "\(prefs.count) on")
             Text("Every scan checks these first and tells you plainly — including when the data can't say.")
                 .font(.footnote)
@@ -187,9 +272,9 @@ struct ProfileView: View {
             SectionHeader(title: "About")
                 .padding(.bottom, 10)
             row("Region", value: API.country, icon: "globe")
-            Divider().overlay(TL.line)
+            Hairline()
             row("Data", value: "Open Food Facts + community", icon: "tray.full")
-            Divider().overlay(TL.line)
+            Hairline()
             Link(destination: URL(string: "https://github.com/TarunVishwakarma1/true-lable")!) {
                 HStack {
                     Label("Source code · Apache-2.0", systemImage: "chevron.left.forwardslash.chevron.right")
@@ -200,7 +285,7 @@ struct ProfileView: View {
                 }
                 .padding(.vertical, 12)
             }
-            Divider().overlay(TL.line)
+            Hairline()
             row("Version", value: version, icon: "app.badge")
         }
         .card()

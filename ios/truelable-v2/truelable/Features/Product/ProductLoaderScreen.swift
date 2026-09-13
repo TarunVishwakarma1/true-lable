@@ -60,7 +60,7 @@ struct ProductLoaderScreen: View {
     }
 
     private func failed(_ message: String) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Spacer()
             Image(systemName: "wifi.slash")
                 .font(.largeTitle)
@@ -93,15 +93,29 @@ struct ProductSkeleton: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                HStack(spacing: 16) {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                HStack(alignment: .top, spacing: 16) {
+                    RoundedRectangle(cornerRadius: TL.R.lg, style: .continuous)
                         .fill(Color.white.opacity(0.08))
-                        .frame(width: 88, height: 88)
-                    Skeleton(lines: 3, height: 14)
+                        .frame(width: 104, height: 104)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Skeleton(lines: 2, height: 18)
+                        Skeleton(lines: 1, height: 10)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Skeleton(lines: 4).card()
+                .padding(.vertical, 8)
+
+                // Shaped like the verdict card it stands in for: a ring
+                // beside two lines, so the wait reads as this page arriving
+                // rather than as some other screen.
+                HStack(spacing: 20) {
+                    Circle().fill(Color.white.opacity(0.08)).frame(width: 88, height: 88)
+                    Skeleton(lines: 2, height: 14)
+                }
+                .card(.hero)
+
                 Skeleton(lines: 3).card()
-                Skeleton(lines: 6).card()
+                Skeleton(lines: 5).card()
             }
             .padding(TL.gutter)
         }

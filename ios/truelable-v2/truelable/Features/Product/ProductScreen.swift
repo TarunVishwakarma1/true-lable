@@ -30,33 +30,32 @@ struct ProductScreen: View {
 
     var body: some View {
         ScrollView {
-            GlassEffectContainer(spacing: 14) {
-                VStack(spacing: 14) {
-                    hero
-                    VerdictCard(product: product)
+            GlassEffectContainer(spacing: 16) {
+                VStack(spacing: 16) {
+                    hero.appear(0)
+                    VerdictCard(product: product).appear(1)
                     if !checks.isEmpty {
-                        ForYouCard(checks: checks)
+                        ForYouCard(checks: checks).appear(2)
                     }
-                    MacroCard(product: product)
+                    MacroCard(product: product).appear(3)
                     if let sugar = product.nutrition.sugar {
-                        SugarCard(sugarGrams: sugar)
+                        SugarCard(sugarGrams: sugar).appear(4)
                     }
                     if !product.nutrition.isEmpty {
-                        LabelCard(product: product)
+                        LabelCard(product: product).appear(5)
                     }
                     if let ingredients = product.ingredients {
-                        IngredientsCard(text: ingredients)
+                        IngredientsCard(text: ingredients).appear(6)
                     }
                     if !product.additives.isEmpty {
-                        AdditivesCard(codes: product.additives)
+                        AdditivesCard(codes: product.additives).appear(6)
                     }
-                    if let allergens = product.allergens {
-                        AllergensCard(raw: allergens)
-                    }
+                    AllergensCard(allergens: product.allergens ?? [], traces: product.traces ?? [])
+                        .appear(6)
                     AlternativesCard(product: product, prefs: DietaryPreference.decode(dietaryRaw))
-                    CommunityCard(product: $product)
-                    compareCard
-                    footer
+                    CommunityCard(product: $product).appear(7)
+                    compareCard.appear(7)
+                    footer.appear(8)
                 }
             }
             .padding(.horizontal, TL.gutter)
@@ -107,21 +106,21 @@ struct ProductScreen: View {
     }
 
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
                 ProductThumb(url: product.imageURL, size: 104, radius: 26)
                     .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
                 VStack(alignment: .leading, spacing: 8) {
                     if let brand = product.brand { Eyebrow(text: brand) }
                     Text(product.name)
-                        .font(.display(26))
+                        .font(.displayM)
                         .tracking(-0.4)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if product.verified {
                     Pill(text: "Verified", color: TL.accent, icon: "checkmark.seal.fill", filled: true)
                 } else if product.isCommunitySourced {
@@ -143,12 +142,12 @@ struct ProductScreen: View {
 
     private var compareCard: some View {
         Button { comparePicker = true } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: "arrow.left.arrow.right")
                     .font(.title3)
                     .foregroundStyle(TL.info)
                     .frame(width: 44, height: 44)
-                    .background(TL.info.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(TL.info.opacity(0.14), in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Line it up against something else")
                         .font(.subheadline.weight(.semibold))
@@ -159,7 +158,7 @@ struct ProductScreen: View {
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
             }
-            .card(radius: 20, padding: 14)
+            .card(.flat)
         }
         .buttonStyle(.pressable)
     }
@@ -204,7 +203,7 @@ struct ComparePickerSheet: View {
                                 Button {
                                     toggle(r.barcode)
                                 } label: {
-                                    HStack(spacing: 14) {
+                                    HStack(spacing: 16) {
                                         Image(systemName: selected.contains(r.barcode) ? "checkmark.circle.fill" : "circle")
                                             .font(.title3)
                                             .foregroundStyle(selected.contains(r.barcode) ? TL.accent : TL.fg3)
@@ -285,8 +284,10 @@ struct ComparePickerSheet: View {
                 return n
             }(),
             ingredients: "Gram flour, edible vegetable oil (palm), potato, salt, spices, red chilli, acidity regulator (E330)",
-            allergens: "en:none",
-            additives: ["E330", "E500II"], novaGroup: 4, nutriscoreGrade: "d",
+            allergens: ["peanuts"], traces: ["tree-nuts"], labels: ["vegetarian"],
+            additives: ["E330", "E500II"], servingSize: "30 g", servingQuantity: 30,
+            nutrientLevels: ["sugar": "low", "sodium": "high", "fat": "high"],
+            novaGroup: 4, nutriscoreGrade: "d",
             isVegan: true, isVegetarian: true, isPalmOilFree: false
         ))
     }

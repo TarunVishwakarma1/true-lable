@@ -49,10 +49,10 @@ struct VerifyView: View {
     }
 
     private var deck: some View {
-        VStack(spacing: 22) {
-            VStack(spacing: 6) {
+        VStack(spacing: 24) {
+            VStack(spacing: 8) {
                 Text("Does this look right?")
-                    .font(.display(28))
+                    .font(.displayM)
                 Text("Someone added this label. Confirm only if you're holding the pack and it matches.")
                     .font(.subheadline)
                     .foregroundStyle(TL.fg2)
@@ -94,17 +94,17 @@ struct VerifyView: View {
 
     private func card(_ c: Candidate, isTop: Bool) -> some View {
         let offset = isTop ? drag : .zero
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
                 ProductThumb(url: c.imageURL, size: 56, radius: 16)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(c.productName).font(.display(20)).lineLimit(2)
+                    Text(c.productName).font(.displayS).lineLimit(2)
                     if let brand = c.brand { Text(brand).font(.footnote).foregroundStyle(TL.fg2) }
                 }
                 Spacer(minLength: 0)
                 GradeBadge(grade: c.nutriscoreGrade)
             }
-            Divider().overlay(TL.line)
+            Hairline()
             VStack(spacing: 8) {
                 stat("Energy", c.energyKcal, "kcal")
                 stat("Sugar", c.sugar, "g")
@@ -119,7 +119,7 @@ struct VerifyView: View {
             }
         }
         .frame(height: 250)
-        .card(radius: 28, fill: TL.elevated)
+        .card(.hero, fill: TL.elevated)
         .overlay(alignment: .topTrailing) {
             if isTop {
                 Pill(text: "MATCHES", color: TL.accent, icon: "checkmark", filled: true)
@@ -160,7 +160,7 @@ struct VerifyView: View {
             Spacer()
             Text(value.map { "\($0.compact) \(unit) / 100 g" } ?? "—")
                 .font(.footnote.weight(.semibold))
-                .monospacedDigit()
+                .numeric()
         }
     }
 

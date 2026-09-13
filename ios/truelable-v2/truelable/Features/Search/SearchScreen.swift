@@ -9,6 +9,27 @@
 
 import SwiftUI
 
+/// Search owns its stack rather than borrowing Home's. A `.searchable`
+/// list pushed into another screen's stack, under a hidden navigation bar,
+/// is the fragile arrangement this used to be.
+struct SearchSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            SearchScreen()
+                .navigationDestination(for: String.self) { ProductLoaderScreen(barcode: $0) }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Close", systemImage: "xmark") { dismiss() }
+                    }
+                }
+        }
+        .presentationBackground(TL.bg)
+        .presentationCornerRadius(TL.R.xl)
+    }
+}
+
 struct SearchScreen: View {
     @State private var query = ""
     @State private var results: [ProductCard] = []
@@ -87,8 +108,8 @@ struct SearchScreen: View {
         }
         if searching && results.isEmpty {
             ForEach(0..<4, id: \.self) { _ in
-                HStack(spacing: 14) {
-                    RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)).frame(width: 56, height: 56)
+                HStack(spacing: 16) {
+                    RoundedRectangle(cornerRadius: TL.R.md).fill(Color.white.opacity(0.08)).frame(width: 56, height: 56)
                     Skeleton(lines: 2)
                 }
                 .listRowBackground(Color.clear)
@@ -106,7 +127,6 @@ struct SearchScreen: View {
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparatorTint(TL.line)
-                .simultaneousGesture(TapGesture().onEnded { remember(trimmed) })
             }
         }
     }
@@ -127,6 +147,7 @@ struct SearchScreen: View {
             let found = try await API.search(trimmed)
             guard !Task.isCancelled else { return }
             withAnimation(.tl(0.3)) { results = found }
+            if !found.isEmpty { remember(trimmed) }
         } catch {
             if !Task.isCancelled { failed = true }
         }

@@ -17,8 +17,8 @@ struct PrimaryButtonStyle: ButtonStyle {
             .engraved(0.6)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(TL.accentGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: TL.accent.opacity(configuration.isPressed ? 0.1 : 0.3), radius: 18, y: 8)
+            .background(TL.accentGradient, in: RoundedRectangle(cornerRadius: TL.R.md, style: .continuous))
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.2 : 0.45), radius: 16, y: 8)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.tl(0.25), value: configuration.isPressed)
     }
@@ -32,7 +32,7 @@ struct SecondaryButtonStyle: ButtonStyle {
             .engraved()
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: TL.R.md, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.tl(0.25), value: configuration.isPressed)
     }
@@ -77,6 +77,14 @@ struct IconButton: View {
     }
 }
 
+/// The one divider in the app. `Divider()` insets and tints itself
+/// differently depending on what it sits inside.
+struct Hairline: View {
+    var body: some View {
+        Rectangle().fill(TL.line).frame(height: 1)
+    }
+}
+
 // MARK: - Text bits
 
 struct SectionHeader: View {
@@ -86,7 +94,7 @@ struct SectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(.headline)
+                .font(.sectionTitle)
                 .foregroundStyle(TL.fg)
             Spacer()
             if let detail {
@@ -115,7 +123,7 @@ struct Pill: View {
     var filled: Bool = false
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             if let icon { Image(systemName: icon).font(.caption2.weight(.bold)) }
             Text(text).font(.caption.weight(.semibold))
         }
@@ -146,8 +154,8 @@ struct ScoreRing: View {
                 .animation(.tl(0.9), value: shown)
             VStack(spacing: 0) {
                 Text("\(score)")
-                    .font(.system(size: size * 0.3, weight: .bold, design: .rounded))
-                    .monospacedDigit()
+                    .font(.display(size * 0.34))
+                    .numeric()
                     .contentTransition(.numericText())
                 Text("/100")
                     .font(.system(size: size * 0.11, weight: .semibold))
@@ -174,7 +182,7 @@ struct GradeStrip: View {
                     .font(.caption.weight(.heavy))
                     .foregroundStyle(on ? TL.ink : TL.fg3)
                     .frame(width: on ? 34 : 26, height: 26)
-                    .background(on ? TL.grade(letter) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(on ? TL.grade(letter) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
             }
         }
         .accessibilityElement()
@@ -212,19 +220,19 @@ struct StatTile: View {
     var tint: Color = TL.accent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Image(systemName: icon)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tint)
             Text(value)
-                .font(.title2.weight(.bold))
-                .monospacedDigit()
+                .font(.displayM)
+                .numeric()
                 .contentTransition(.numericText())
             Text(label)
                 .font(.caption)
                 .foregroundStyle(TL.fg3)
         }
-        .card(radius: 20, padding: 16)
+        .card(.flat)
     }
 }
 
@@ -268,7 +276,7 @@ struct Skeleton: View {
     var height: CGFloat = 12
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(0..<lines, id: \.self) { i in
                 RoundedRectangle(cornerRadius: height / 2)
                     .fill(Color.white.opacity(0.08))
@@ -289,14 +297,14 @@ struct ProductCardRow: View {
     var trailing: String? = nil
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             ProductThumb(url: card.imageURL, size: 56, radius: 16)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(card.productName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if let brand = card.brand { Text(brand).lineLimit(1) }
                     if card.verified {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(TL.accent)
@@ -306,10 +314,10 @@ struct ProductCardRow: View {
                 .foregroundStyle(TL.fg3)
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: 8) {
                 GradeBadge(grade: card.nutriscoreGrade)
                 if let trailing {
-                    Text(trailing).font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(TL.accent)
+                    Text(trailing).font(.caption.weight(.semibold)).numeric().foregroundStyle(TL.good)
                 }
             }
             Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
@@ -343,7 +351,7 @@ struct PlusTag: View {
             .foregroundStyle(TL.ink)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(TL.accentGradient, in: Capsule())
+            .background(TL.plusGradient, in: Capsule())
     }
 }
 
@@ -352,10 +360,10 @@ struct PlusTag: View {
 /// Static brand mark — a barcode with two accent bars.
 struct BarcodeGlyph: View {
     var body: some View {
-        HStack(alignment: .center, spacing: 5) {
+        HStack(alignment: .center, spacing: 4) {
             ForEach(Array([4.0, 8, 3, 10, 3, 6, 3, 8].enumerated()), id: \.offset) { i, w in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(i == 1 || i == 5 ? TL.accent : TL.fg)
+                    .fill(i == 1 || i == 5 ? TL.accentDim : TL.fg)
                     .frame(width: w)
             }
         }
@@ -377,9 +385,9 @@ struct Backdrop: View {
                 [0, 1], [0.5, 1], [1, 1]
             ],
             colors: [
-                Color(hex: 0x0A0B0D), Color(hex: 0x0C1512), Color(hex: 0x15382E),
-                Color(hex: 0x0A0B0D), Color(hex: 0x112620), Color(hex: 0x0D1B24),
-                Color(hex: 0x161129), Color(hex: 0x0A0B0D), Color(hex: 0x0A0B0D)
+                Color(hex: 0x0C0B0A), Color(hex: 0x191310), Color(hex: 0x2A1E12),
+                Color(hex: 0x0C0B0A), Color(hex: 0x1C1611), Color(hex: 0x14101A),
+                Color(hex: 0x1E1524), Color(hex: 0x0C0B0A), Color(hex: 0x0C0B0A)
             ]
         )
         .opacity(intensity)

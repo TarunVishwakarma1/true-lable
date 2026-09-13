@@ -84,7 +84,7 @@ struct ContributeFlow: View {
     }
 
     private var progress: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
                     .fill(i <= stepIndex ? TL.accent : Color.white.opacity(0.16))
@@ -103,7 +103,7 @@ struct ContributeFlow: View {
                 .ignoresSafeArea()
                 .id(take)
         } else {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 Image(systemName: "camera.fill").font(.largeTitle).foregroundStyle(TL.fg3)
                 Text("Live text capture needs a camera").font(.title3.weight(.semibold))
                 Text("Try on a device with a camera to add products.").font(.subheadline).foregroundStyle(TL.fg2)
@@ -114,9 +114,9 @@ struct ContributeFlow: View {
 
     private func takeChrome(_ take: Take) -> some View {
         VStack(spacing: 0) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(take.title)
-                    .font(.display(28))
+                    .font(.displayM)
                     .foregroundStyle(.white)
                 Text(take.hint)
                     .font(.footnote)
@@ -135,7 +135,7 @@ struct ContributeFlow: View {
                     .frame(width: 8, height: 8)
                 Text(tally.lockedCount == 0 ? "Looking for text" : "\(tally.lockedCount) lines locked")
                     .font(.caption.weight(.semibold))
-                    .monospacedDigit()
+                    .numeric()
                     .contentTransition(.numericText())
             }
             .foregroundStyle(.white)
@@ -205,14 +205,14 @@ struct ContributeFlow: View {
     }
 
     private var done: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Spacer()
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(TL.accent)
                 .symbolEffect(.bounce, value: finished)
             Text("Thanks — it's in")
-                .font(.display(30))
+                .font(.displayM)
             Text("Searchable right away, marked unverified until three people confirm it against the pack.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
@@ -226,13 +226,13 @@ struct ContributeFlow: View {
     }
 
     private func failed(_ message: String) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Spacer()
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(TL.warn)
             Text("That didn't go through")
-                .font(.display(28))
+                .font(.displayM)
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
@@ -300,10 +300,10 @@ private struct ReviewStep: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Does this look right?")
-                        .font(.display(30))
+                        .font(.displayM)
                     Text("Fix anything the camera misread. You're the one holding the pack.")
                         .font(.subheadline)
                         .foregroundStyle(TL.fg2)
@@ -316,7 +316,7 @@ private struct ReviewStep: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("READ FROM THE FRONT · TAP TO USE")
                                 .font(.caption2.weight(.bold)).tracking(1).foregroundStyle(TL.paperMuted)
-                            FlowLayout(spacing: 6) {
+                            FlowLayout(spacing: 8) {
                                 ForEach(draft.nameCandidates, id: \.self) { c in
                                     Menu {
                                         Button("Use as brand") { draft.brand = c }
@@ -336,12 +336,12 @@ private struct ReviewStep: View {
                     field("Allergens (comma-separated)", text: $allergens)
                 }
                 .padding(18)
-                .background(TL.paper, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(TL.paper, in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
                 .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
 
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(title: "Nutrition per 100 g", detail: "optional")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                         numberField("Energy", unit: "kcal", text: $kcal)
                         numberField("Fat", unit: "g", text: $fat)
                         numberField("Carbs", unit: "g", text: $carbs)
@@ -410,12 +410,12 @@ private struct ReviewStep: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .font(.subheadline.weight(.semibold))
-                .monospacedDigit()
+                .numeric()
                 .frame(width: 64)
             Text(unit).font(.caption).foregroundStyle(TL.fg3).frame(width: 28, alignment: .leading)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
     }
 }

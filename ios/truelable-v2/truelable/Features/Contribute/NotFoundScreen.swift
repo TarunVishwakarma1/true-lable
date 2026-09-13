@@ -19,7 +19,7 @@ struct NotFoundScreen: View {
         VStack(spacing: 20) {
             Spacer()
             ZStack {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                RoundedRectangle(cornerRadius: TL.R.xl, style: .continuous)
                     .fill(TL.warn.opacity(0.12))
                     .frame(width: 96, height: 96)
                 Image(systemName: "plus.viewfinder")
@@ -27,7 +27,7 @@ struct NotFoundScreen: View {
                     .foregroundStyle(TL.warn)
             }
             Text("Not in the catalogue yet")
-                .font(.display(30))
+                .font(.displayM)
             Text("You can be the first. Point the camera at the pack — front, ingredients, nutrition — and it's read live on your phone.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)

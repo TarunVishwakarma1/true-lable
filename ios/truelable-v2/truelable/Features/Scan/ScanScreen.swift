@@ -16,13 +16,21 @@ import VisionKit
 struct ScanScreen: View {
     @Environment(\.dismiss) private var dismiss
 
-    private struct Lookup: Identifiable {
-        let barcode: String
-        var id: String { barcode }
+    /// One sheet, by value — two `.sheet` modifiers on a single view race
+    /// each other within a frame.
+    private enum Presented: Identifiable {
+        case product(String)
+        case manualEntry
+
+        var id: String {
+            switch self {
+            case .product(let barcode): "product-\(barcode)"
+            case .manualEntry: "manual"
+            }
+        }
     }
 
-    @State private var lookup: Lookup?
-    @State private var manualEntry = false
+    @State private var presented: Presented?
     @State private var qr: String?
     @State private var invalid: String?
     @State private var torch = false
@@ -34,7 +42,7 @@ struct ScanScreen: View {
     @State private var authorized: Bool?
 
     private var usable: Bool { authorized == true && DataScannerViewController.isSupported }
-    private var cameraActive: Bool { lookup == nil && !manualEntry && qr == nil }
+    private var cameraActive: Bool { presented == nil && qr == nil }
 
     var body: some View {
         Group {
@@ -59,18 +67,20 @@ struct ScanScreen: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sheet(item: $lookup, onDismiss: { lastSeen = .now }) { item in
-            NavigationStack {
-                ProductLoaderScreen(barcode: item.barcode, inSheet: true)
-                    .navigationDestination(for: String.self) { ProductLoaderScreen(barcode: $0) }
+        .sheet(item: $presented, onDismiss: { lastSeen = .now }) { item in
+            switch item {
+            case .product(let barcode):
+                NavigationStack {
+                    ProductLoaderScreen(barcode: barcode, inSheet: true)
+                        .navigationDestination(for: String.self) { ProductLoaderScreen(barcode: $0) }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(TL.bg)
+                .presentationCornerRadius(TL.R.xl)
+            case .manualEntry:
+                ManualEntrySheet()
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(TL.bg)
-            .presentationCornerRadius(32)
-        }
-        .sheet(isPresented: $manualEntry) {
-            ManualEntrySheet()
         }
         .sensoryFeedback(.success, trigger: scanned)
         .sensoryFeedback(.warning, trigger: invalidCount)
@@ -131,7 +141,7 @@ struct ScanScreen: View {
     }
 
     private var reticle: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Text(cameraActive ? "Point at a barcode" : "Camera off while you read")
                 .font(.caption.weight(.semibold))
                 .tracking(1)
@@ -142,7 +152,7 @@ struct ScanScreen: View {
                 .glassEffect(.regular, in: .capsule)
 
             ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: TL.R.xl, style: .continuous)
                     .fill(TL.accent.opacity(cameraActive ? 0.06 : 0))
                 ReticleCorners()
                     .stroke(cameraActive ? .white : TL.fg3, style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -156,12 +166,12 @@ struct ScanScreen: View {
     }
 
     private var bottomBar: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             Text("Works on EAN and UPC barcodes on packaged food.")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.6))
             Button {
-                manualEntry = true
+                presented = .manualEntry
             } label: {
                 Label("Type the barcode", systemImage: "keyboard")
                     .font(.subheadline.weight(.semibold))
@@ -176,7 +186,7 @@ struct ScanScreen: View {
     }
 
     private var unavailable: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             Image(systemName: "camera.fill")
                 .font(.largeTitle)
                 .foregroundStyle(TL.fg3)
@@ -216,7 +226,7 @@ struct ScanScreen: View {
                 .foregroundStyle(TL.fg2)
                 .lineLimit(4)
                 .multilineTextAlignment(.center)
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 if let url = URL(string: value), url.scheme?.hasPrefix("http") == true {
                     Link(destination: url) {
                         Label("Open", systemImage: "safari").frame(maxWidth: .infinity)
@@ -236,7 +246,7 @@ struct ScanScreen: View {
         }
         .engraved()
         .padding(22)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: TL.R.xl, style: .continuous))
         .padding(.horizontal, 28)
     }
 
@@ -263,7 +273,7 @@ struct ScanScreen: View {
                 return
             }
             scanned += 1
-            lookup = Lookup(barcode: BarcodeChecksum.normalized(code))
+            presented = .product(BarcodeChecksum.normalized(code))
         }
     }
 }
@@ -337,14 +347,14 @@ struct ManualEntrySheet: View {
                     .font(.system(.title2, design: .monospaced).weight(.semibold))
                     .focused($focused)
                     .padding(18)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(valid ? TL.accent : .clear))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: TL.R.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: TL.R.md, style: .continuous).strokeBorder(valid ? TL.accent : .clear))
                     .onChange(of: code) { _, new in
                         let filtered = String(new.filter(\.isNumber).prefix(13))
                         if filtered != new { code = filtered }
                     }
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: valid ? "checkmark.circle.fill" : "circle.dotted")
                         .foregroundStyle(valid ? TL.accent : TL.fg3)
                     Text(valid ? "Looks like a valid barcode" : "\(digits.count) digit\(digits.count == 1 ? "" : "s")")

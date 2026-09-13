@@ -43,7 +43,7 @@ struct PlusView: View {
         ScrollView {
             VStack(spacing: 20) {
                 marketing
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Button {
                         Task {
                             if await plus.activateGiveaway() { dismiss() }
@@ -88,9 +88,9 @@ struct PlusView: View {
     }
 
     private var marketing: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 24) {
             Text("Everything you use\ntoday stays free.")
-                .font(.display(34))
+                .font(.displayL)
                 .tracking(-0.6)
             Text("Scanning, results, verifying, adding products — none of it is behind Plus, and it won't be. Plus is the extra layer for people who want to go deeper.")
                 .font(.subheadline)
@@ -109,28 +109,28 @@ struct PlusView: View {
     }
 
     private func perk(_ icon: String, _ title: String, _ body: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(TL.accent)
+                .foregroundStyle(TL.brass)
                 .frame(width: 36, height: 36)
-                .background(TL.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
+                .background(TL.brassDeep.opacity(0.18), in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.subheadline.weight(.semibold))
                 Text(body).font(.footnote).foregroundStyle(TL.fg2)
             }
         }
-        .card(radius: 18, padding: 14)
+        .card(.flat)
     }
 
     private var active: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 20) {
             Spacer()
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(TL.accent)
+                .foregroundStyle(TL.plusGradient)
             Text("You're on Plus")
-                .font(.display(32))
+                .font(.displayL)
             Text(plus.isComplimentary
                  ? "Trends, four-way compare and ranked swaps are on, free while we build it."
                  : "Trends, four-way compare and ranked swaps are all on. Thank you for keeping this independent.")
@@ -169,17 +169,17 @@ struct PlusBanner: View {
 
     var body: some View {
         Button { showing = true } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(TL.accentGradient)
+                    RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous)
+                        .fill(TL.plusGradient)
                         .frame(width: 44, height: 44)
                     Image(systemName: "sparkles")
                         .font(.body.weight(.bold))
                         .foregroundStyle(TL.ink)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("TrueLabel Plus").font(.subheadline.weight(.semibold))
                     }
                     Text(Plus.shared.isGiveaway
@@ -192,7 +192,7 @@ struct PlusBanner: View {
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
             }
-            .card(radius: 20, fill: TL.elevated, padding: 14)
+            .card(.flat, fill: TL.elevated)
         }
         .buttonStyle(.pressable)
         .sheet(isPresented: $showing) { PlusView() }
@@ -206,7 +206,7 @@ struct PlusGate: View {
 
     var body: some View {
         Button { showing = true } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 PlusTag()
                 Text(text).font(.footnote.weight(.medium)).foregroundStyle(TL.fg2)
                 Spacer()

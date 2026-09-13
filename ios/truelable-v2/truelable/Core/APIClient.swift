@@ -8,26 +8,29 @@
 //    GET  /api/v1/products/query?q&country&limit
 //    GET  /api/v1/products/trending?country&limit
 //    GET  /api/v1/products/alternatives?barcode&country&sort_by&limit
-//    GET  /api/v1/products/needs-verification?country&device_id&limit
-//    POST /api/v1/products/verify   {barcode, country, device_id}
-//    GET  /api/v1/users/{id}/profile?country
-//    PUT  /api/v1/users/{id}/profile        {country?, dietary_preferences?}
-//    GET  /api/v1/users/{id}/subscription
-//    POST /api/v1/users/{id}/subscription   activate
-//    DELETE /api/v1/users/{id}/subscription cancel
-//    POST /api/v1/users/{id}/link          {identity_token, display_name?}
-//    POST /api/v1/users/{id}/unlink
-//    DELETE /api/v1/users/{id}              delete the account
+//    GET  /api/v1/products/needs-verification?country&limit
+//    POST /api/v1/products/verify             {barcode, country}
+//    POST /api/v1/auth/device                 issues this install's token
+//    GET  /api/v1/me/profile
+//    PUT  /api/v1/me/profile                  {country?, dietary_preferences?, display_name?}
+//    GET  /api/v1/me/stats
+//    GET  /api/v1/me/subscription
+//    POST /api/v1/me/subscription             activate
+//    DELETE /api/v1/me/subscription           cancel
+//    POST /api/v1/me/link                     {identity_token, display_name?}
+//    POST /api/v1/me/unlink
+//    DELETE /api/v1/me/account
 //    POST /api/v1/ocr/submit        {barcode, country, extracted_text, reviewed_ingredients,
 //                                    reviewed_allergens, product_name?, brand?, nutrition?}
 //
 
 import Foundation
-import UIKit
 
 enum APIError: LocalizedError {
     case notFound
     case offline
+    case unauthorized
+    case rateLimited
     case server(Int)
     case invalid
 
@@ -35,10 +38,18 @@ enum APIError: LocalizedError {
         switch self {
         case .notFound: "Not in the catalogue yet"
         case .offline: "Couldn't reach TrueLabel. Check your connection and try again."
+        case .unauthorized: "This device couldn't be recognised. Try again in a moment."
+        case .rateLimited: "That's a lot of requests. Give it a minute and try again."
         case .server(let code): "The server had a problem (HTTP \(code)). Try again in a moment."
         case .invalid: "That response didn't make sense. Try again."
         }
     }
+}
+
+/// Handed out once per install and kept in the Keychain from then on.
+struct DeviceRegistration: Decodable, Sendable {
+    var deviceId: String
+    var token: String
 }
 
 enum API {
@@ -64,7 +75,6 @@ enum API {
 
     /// Backend defaults to IN; match it when the device has no region.
     static var country: String { Locale.current.region?.identifier ?? "IN" }
-    static var deviceID: String? { UIDevice.current.identifierForVendor?.uuidString }
 
     // MARK: Endpoints
 
@@ -92,16 +102,17 @@ enum API {
     }
 
     static func verify(barcode: String) async throws -> Product {
-        struct Body: Encodable { var barcode: String; var country: String; var deviceId: String? }
-        let env: Envelope<Product> = try await post("api/v1/products/verify", Body(barcode: barcode, country: country, deviceId: deviceID))
+        struct Body: Encodable { var barcode: String; var country: String }
+        let env: Envelope<Product> = try await post("api/v1/products/verify", Body(barcode: barcode, country: country))
         guard let p = env.data else { throw APIError.invalid }
         return p
     }
 
     static func needsVerification(limit: Int = 12) async throws -> [Candidate] {
-        var q = ["country": country, "limit": "\(limit)"]
-        if let deviceID { q["device_id"] = deviceID }
-        let env: Envelope<[Candidate]> = try await get("api/v1/products/needs-verification", q)
+        let env: Envelope<[Candidate]> = try await get(
+            "api/v1/products/needs-verification",
+            ["country": country, "limit": "\(limit)"]
+        )
         return env.data ?? []
     }
 
@@ -116,11 +127,21 @@ enum API {
         var nutrition: Nutrition?
     }
 
+    // MARK: Identity
+
+    /// The only unauthenticated write. Called once per install by
+    /// `DeviceAuth`; everything else sends the token it returns.
+    static func registerDevice() async throws -> DeviceRegistration {
+        let env: Envelope<DeviceRegistration> = try await send("api/v1/auth/device", method: "POST", authenticated: false)
+        guard let registration = env.data else { throw APIError.invalid }
+        return registration
+    }
+
     // MARK: Profile and subscription
 
     /// Reading a profile creates it, so there is no registration step.
     static func profile() async throws -> Profile {
-        let env: Envelope<Profile> = try await get("api/v1/users/\(try id())/profile", ["country": country])
+        let env: Envelope<Profile> = try await get("api/v1/me/profile", ["country": country])
         guard let p = env.data else { throw APIError.invalid }
         return p
     }
@@ -134,55 +155,54 @@ enum API {
             var displayName: String?
         }
         let env: Envelope<Profile> = try await put(
-            "api/v1/users/\(try id())/profile",
+            "api/v1/me/profile",
             Body(country: country, dietaryPreferences: dietaryPreferences, displayName: displayName)
         )
         guard let p = env.data else { throw APIError.invalid }
         return p
     }
 
+    static func stats() async throws -> ContributionStats {
+        let env: Envelope<ContributionStats> = try await get("api/v1/me/stats", [:])
+        guard let s = env.data else { throw APIError.invalid }
+        return s
+    }
+
     static func subscription() async throws -> Subscription {
-        let env: Envelope<Subscription> = try await get("api/v1/users/\(try id())/subscription", [:])
+        let env: Envelope<Subscription> = try await get("api/v1/me/subscription", [:])
         guard let s = env.data else { throw APIError.invalid }
         return s
     }
 
     static func activatePlus() async throws -> Subscription {
-        let env: Envelope<Subscription> = try await send("api/v1/users/\(try id())/subscription", method: "POST")
+        let env: Envelope<Subscription> = try await send("api/v1/me/subscription", method: "POST")
         guard let s = env.data else { throw APIError.invalid }
         return s
     }
 
     static func cancelPlus() async throws -> Subscription {
-        let env: Envelope<Subscription> = try await send("api/v1/users/\(try id())/subscription", method: "DELETE")
+        let env: Envelope<Subscription> = try await send("api/v1/me/subscription", method: "DELETE")
         guard let s = env.data else { throw APIError.invalid }
         return s
     }
 
     static func linkApple(identityToken: String, displayName: String?) async throws -> Profile {
         struct Body: Encodable { var identityToken: String; var displayName: String? }
-        let env: Envelope<Profile> = try await post("api/v1/users/\(try id())/link",
+        let env: Envelope<Profile> = try await post("api/v1/me/link",
                                                     Body(identityToken: identityToken, displayName: displayName))
         guard let p = env.data else { throw APIError.invalid }
         return p
     }
 
     static func unlinkApple() async throws -> Profile {
-        let env: Envelope<Profile> = try await send("api/v1/users/\(try id())/unlink", method: "POST")
+        let env: Envelope<Profile> = try await send("api/v1/me/unlink", method: "POST")
         guard let p = env.data else { throw APIError.invalid }
         return p
     }
 
     static func deleteAccount() async throws {
         struct Reply: Decodable { var deleted: Bool? }
-        let _: Envelope<Reply> = try await send("api/v1/users/\(try id())", method: "DELETE")
-    }
-
-    /// Every per-user call is keyed on identifierForVendor. It is nil only in
-    /// odd states (before first unlock), and there is nothing to fall back to.
-    private static func id() throws -> String {
-        guard let deviceID else { throw APIError.invalid }
-        return deviceID
+        let _: Envelope<Reply> = try await send("api/v1/me/account", method: "DELETE")
     }
 
     static func submitLabel(_ submission: LabelSubmission) async throws {
@@ -199,7 +219,9 @@ enum API {
 
     private static func get<T: Decodable>(_ path: String, _ query: [String: String]) async throws -> T {
         var components = URLComponents(url: APIEnvironment.baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
-        components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        components.queryItems = query.isEmpty
+            ? nil
+            : query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         return try await run(URLRequest(url: components.url!))
     }
 
@@ -212,10 +234,10 @@ enum API {
     }
 
     /// A body-less POST or DELETE.
-    private static func send<T: Decodable>(_ path: String, method: String) async throws -> T {
+    private static func send<T: Decodable>(_ path: String, method: String, authenticated: Bool = true) async throws -> T {
         var request = URLRequest(url: APIEnvironment.baseURL.appending(path: path))
         request.httpMethod = method
-        return try await run(request)
+        return try await run(request, authenticated: authenticated)
     }
 
     private static func post<T: Decodable>(_ path: String, _ body: some Encodable) async throws -> T {
@@ -226,7 +248,16 @@ enum API {
         return try await run(request)
     }
 
-    private static func run<T: Decodable>(_ request: URLRequest) async throws -> T {
+    private static func run<T: Decodable>(
+        _ request: URLRequest,
+        authenticated: Bool = true,
+        retryingAfterReauth: Bool = true
+    ) async throws -> T {
+        var request = request
+        if authenticated {
+            request.setValue("Bearer \(try await DeviceAuth.shared.token())", forHTTPHeaderField: "Authorization")
+        }
+
         let data: Data
         let response: URLResponse
         do {
@@ -240,8 +271,17 @@ enum API {
         switch http.statusCode {
         case 200..<300:
             do { return try decoder.decode(T.self, from: data) } catch { throw APIError.invalid }
+        case 401 where authenticated && retryingAfterReauth:
+            // The row behind our token is gone — the account was deleted, or
+            // the database was reset. Register again and try once.
+            await DeviceAuth.shared.forget()
+            return try await run(request, authenticated: true, retryingAfterReauth: false)
+        case 401:
+            throw APIError.unauthorized
         case 404:
             throw APIError.notFound
+        case 429:
+            throw APIError.rateLimited
         default:
             throw APIError.server(http.statusCode)
         }
@@ -264,6 +304,14 @@ struct ProductCard: Decodable, Identifiable, Hashable, Sendable {
     var sortValue: Double?
 
     var imageURL: URL? { imageUrl.flatMap(URL.init(string:)) }
+}
+
+/// What this device has put into the catalogue. Contribution, never
+/// consumption — how much someone scans stays on their phone.
+struct ContributionStats: Decodable, Sendable {
+    var confirmations: Int
+    var contributions: Int
+    var helpedVerify: Int
 }
 
 struct Profile: Decodable, Sendable {

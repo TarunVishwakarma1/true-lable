@@ -37,7 +37,10 @@ struct DecodingTests {
       "id":"c2e1","barcode":"8901030895564","country":"IN","product_name":"Aloo Bhujia","brand":"Haldiram's",
       "image_url":"https://images.example/a.jpg",
       "nutrition_facts":{"energy_kcal":546,"protein":"9.2","carbs":43.8,"fat":36.4,"sugar":null,"sodium":1.18},
-      "ingredients":"Gram flour, palm oil, potato","allergens":"en:peanuts,en:milk","source":"open_food_facts",
+      "ingredients":"Gram flour, palm oil, potato","allergens":["peanuts","milk"],"traces":["tree-nuts"],
+      "labels":["vegetarian"],"serving_size":"30 g","serving_quantity":30,
+      "nutrition_per_serving":{"energy_kcal":163.8},"nutrient_levels":{"sodium":"high"},
+      "nutriscore_score":18,"ecoscore_grade":"d","quantity":"200 g","source":"open_food_facts",
       "verified":false,"verification_count":1,"additives":["E330","E500II"],"nova_group":4,"nutriscore_grade":"d",
       "is_vegan":true,"is_vegetarian":true,"is_palm_oil_free":false,"category":"namkeen"}}
     """.data(using: .utf8)!
@@ -59,6 +62,11 @@ struct DecodingTests {
         #expect(p.nutrition.sugar == nil)          // null tolerated
         #expect(p.nutrition.sodiumMg == 1180)
         #expect(p.additives == ["E330", "E500II"])
+        #expect(p.allergens == ["peanuts", "milk"])
+        #expect(p.traces == ["tree-nuts"])
+        #expect(p.servingQuantity == 30)
+        #expect(p.nutritionPerServing?.energyKcal == 163.8)
+        #expect(p.nutrientLevels?["sodium"] == "high")
         #expect(p.healthScore == 45)               // d (-40) + nova 4 (-15)
     }
 
@@ -176,5 +184,49 @@ struct NutriscoreTests {
         #expect(Nutriscore.letter("not-applicable") == nil)
         #expect(Nutriscore.letter("") == nil)
         #expect(Nutriscore.letter(nil) == nil)
+    }
+}
+
+struct AllergenCheckTests {
+    /// The bug this guards: "gluten free" contains "gluten", so matching the
+    /// bare substring flagged exactly the products someone avoiding gluten
+    /// should be able to buy.
+    @Test func certifiedGlutenFreeIsNotReportedAsContainingGluten() {
+        let certified = Product(barcode: "1", name: "Oats", labels: ["en-gluten-free", "gluten-free"])
+        #expect(PersonalCheck.run([.glutenFree], on: certified).first?.status == .good)
+
+        // Community products carry no tags, only the text a person typed.
+        let statedInText = Product(barcode: "2", name: "Oats", ingredients: "Rolled oats, gluten free")
+        #expect(PersonalCheck.run([.glutenFree], on: statedInText).first?.status == .good)
+
+        let genuinelyContains = Product(barcode: "3", name: "Biscuit", ingredients: "Wheat flour, sugar")
+        #expect(PersonalCheck.run([.glutenFree], on: genuinelyContains).first?.status == .avoid)
+    }
+
+    @Test func mayContainIsACautionNotARefusal() {
+        let product = Product(barcode: "1", name: "Chocolate", allergens: ["milk"], traces: ["peanuts"])
+        let check = PersonalCheck.run([.peanutAllergy], on: product).first
+        #expect(check?.status == .caution)
+        #expect(check?.message.contains("May contain") == true)
+    }
+
+    @Test func declaredNoneIsNotTheSameAsNotPublished() {
+        let declaresNone = Product(barcode: "1", name: "Water", allergens: [])
+        #expect(PersonalCheck.run([.peanutAllergy], on: declaresNone).first?.status == .good)
+
+        // Nothing published and no ingredients: we do not know, and saying
+        // "no peanuts" would be a claim we cannot support.
+        let silent = Product(barcode: "2", name: "Mystery")
+        #expect(PersonalCheck.run([.peanutAllergy], on: silent).first?.status == .unknown)
+    }
+
+    @Test func thePublishedTrafficLightWinsOverOurThresholds() {
+        var nutrition = Nutrition()
+        nutrition.sugar = 1.0
+        let product = Product(barcode: "1", name: "Drink", nutrition: nutrition,
+                              nutrientLevels: ["sugar": "high"])
+        // Our own thresholds would call 1 g low; the source says high for a
+        // drink, and the source wins.
+        #expect(PersonalCheck.run([.lowSugar], on: product).first?.status == .avoid)
     }
 }

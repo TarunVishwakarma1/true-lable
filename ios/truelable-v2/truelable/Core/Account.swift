@@ -103,6 +103,9 @@ final class Account {
         defer { busy = false }
         do {
             try await API.deleteAccount()
+            // The row the token points at is gone, so the token is spent.
+            // Dropping it now saves a round trip that would 401 anyway.
+            await DeviceAuth.shared.forget()
             apply(nil)
             await Plus.shared.refresh()
             return true

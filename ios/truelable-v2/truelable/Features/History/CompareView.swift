@@ -84,7 +84,7 @@ struct CompareView: View {
                 }
                 .frame(width: columnWidth, alignment: .leading)
                 .padding(.vertical, 12)
-                .overlay(alignment: .top) { Divider().overlay(TL.line) }
+                .overlay(alignment: .top) { Hairline() }
             }
         }
     }
@@ -98,7 +98,7 @@ struct CompareView: View {
                     .foregroundStyle(TL.nova(r.novaGroup))
                     .frame(width: columnWidth, alignment: .leading)
                     .padding(.vertical, 12)
-                    .overlay(alignment: .top) { Divider().overlay(TL.line) }
+                    .overlay(alignment: .top) { Hairline() }
             }
         }
     }
@@ -109,16 +109,16 @@ struct CompareView: View {
             .foregroundStyle(TL.fg3)
             .frame(width: labelWidth, alignment: .leading)
             .padding(.vertical, 12)
-            .overlay(alignment: .top) { Divider().overlay(TL.line) }
+            .overlay(alignment: .top) { Hairline() }
     }
 
     private func cell(_ text: String, highlighted: Bool) -> some View {
         Text(text)
             .font(.subheadline.weight(highlighted ? .bold : .regular))
-            .monospacedDigit()
-            .foregroundStyle(highlighted ? TL.accent : TL.fg)
+            .numeric()
+            .foregroundStyle(highlighted ? TL.good : TL.fg)
             .frame(width: columnWidth, alignment: .leading)
             .padding(.vertical, 12)
-            .overlay(alignment: .top) { Divider().overlay(TL.line) }
+            .overlay(alignment: .top) { Hairline() }
     }
 }

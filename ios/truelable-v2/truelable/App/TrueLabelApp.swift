@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 @main
 struct TrueLabelApp: App {
@@ -14,6 +15,32 @@ struct TrueLabelApp: App {
         // Open Food Facts photos are immutable, so the default 20 MB shared
         // cache is the only reason a thumbnail is ever fetched twice.
         URLCache.shared = URLCache(memoryCapacity: 32 << 20, diskCapacity: 256 << 20)
+        Self.styleNavigationBar()
+    }
+
+    /// SwiftUI has no API for a navigation title's font, and leaving it as
+    /// the system sans meant every screen but Home spoke in a different
+    /// voice from the one the app was designed in.
+    private static func styleNavigationBar() {
+        func serif(_ size: CGFloat, _ weight: UIFont.Weight) -> UIFont {
+            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            guard let descriptor = base.fontDescriptor.withDesign(.serif) else { return base }
+            return UIFont(descriptor: descriptor, size: size)
+        }
+
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.titleTextAttributes = [
+            .font: serif(17, .semibold),
+            .foregroundColor: UIColor(TL.fg)
+        ]
+        appearance.largeTitleTextAttributes = [
+            .font: serif(32, .bold),
+            .foregroundColor: UIColor(TL.fg)
+        ]
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
     }
 
     var body: some Scene {
@@ -43,7 +70,15 @@ struct TrueLabelApp: App {
 @Observable
 final class AppRouter {
     enum Tab: Hashable { case home, history, verify, you }
+
+    /// One sheet at a time, by value. Two `.sheet` modifiers on one view is
+    /// not supported and races within a frame.
+    enum Sheet: String, Identifiable {
+        case manualEntry, search
+        var id: String { rawValue }
+    }
+
     var tab: Tab = .home
     var scannerPresented = false
-    var manualEntryPresented = false
+    var sheet: Sheet?
 }

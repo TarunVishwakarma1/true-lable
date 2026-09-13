@@ -22,9 +22,9 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    headline
+                VStack(alignment: .leading, spacing: 20) {
+                    header.appear(0)
+                    headline.appear(1)
                     searchBar
                     stats
                     if !records.isEmpty { recents }
@@ -54,7 +54,7 @@ struct HomeView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Text("TrueLabel")
                 .font(.headline)
             Spacer()
@@ -66,7 +66,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Eyebrow(text: greeting)
             Text("What's really\nin it?")
-                .font(.display(34))
+                .font(.displayL)
                 .tracking(-0.8)
                 .lineSpacing(-3)
             Text("Point at a barcode. Sugar in teaspoons, additives by name, and whether it fits how you eat.")
@@ -86,9 +86,9 @@ struct HomeView: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
-            NavigationLink {
-                SearchScreen()
+        HStack(spacing: 12) {
+            Button {
+                router.sheet = .search
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
@@ -109,7 +109,7 @@ struct HomeView: View {
             .buttonStyle(.pressable)
 
             Button {
-                router.manualEntryPresented = true
+                router.sheet = .manualEntry
             } label: {
                 Image(systemName: "keyboard")
                     .font(.body.weight(.semibold))
@@ -125,7 +125,7 @@ struct HomeView: View {
     }
 
     private var stats: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             StatTile(value: "\(records.count)", label: "Products", icon: "barcode")
             StatTile(value: "\(thisWeek)", label: "This week", icon: "calendar", tint: TL.info)
             StatTile(value: "\(verifiedCount)", label: "Confirmed", icon: "checkmark.seal.fill", tint: TL.warn)
@@ -138,14 +138,14 @@ struct HomeView: View {
     }
 
     private var recents: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 SectionHeader(title: "Recent")
                 Button("See all") { router.tab = .history }
                     .font(.footnote.weight(.semibold))
             }
             ScrollView(.horizontal) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(records.prefix(10)) { record in
                         NavigationLink(value: record.barcode) { RecentCard(record: record) }
                             .buttonStyle(.pressable)
@@ -160,12 +160,12 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 SectionHeader(title: "Popular in \(API.country)")
-                NavigationLink("See all") { SearchScreen() }
+                Button("Search") { router.sheet = .search }
                     .font(.footnote.weight(.semibold))
             }
             VStack(spacing: 0) {
                 ForEach(Array(trending.prefix(4).enumerated()), id: \.element.id) { index, card in
-                    if index > 0 { Divider().overlay(TL.line) }
+                    if index > 0 { Hairline() }
                     NavigationLink(value: card.barcode) {
                         ProductCardRow(card: card)
                             .padding(.vertical, 10)
@@ -194,12 +194,12 @@ struct HomeView: View {
 
     private func nudgeCard(icon: String, tint: Color, title: String, body: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
                     .font(.title3)
                     .foregroundStyle(tint)
                     .frame(width: 44, height: 44)
-                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: TL.R.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.subheadline.weight(.semibold))
                     Text(body).font(.footnote).foregroundStyle(TL.fg2)
@@ -207,7 +207,7 @@ struct HomeView: View {
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(TL.fg3)
             }
-            .card(radius: 20, padding: 14)
+            .card(.flat)
         }
         .buttonStyle(.pressable)
     }
@@ -217,7 +217,7 @@ struct RecentCard: View {
     let record: ScanRecord
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 ProductThumb(url: record.imageURL, size: 52, radius: 14)
                 Spacer()
@@ -236,7 +236,7 @@ struct RecentCard: View {
             }
         }
         .frame(width: 144, alignment: .leading)
-        .card(radius: 20, padding: 12)
+        .card(.flat)
     }
 }
 

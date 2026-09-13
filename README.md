@@ -328,7 +328,9 @@ Migrations run automatically at boot (`db::run_migrations`), in
 │ is_vegetarian     BOOLEAN (tri-state)      │      │ parsed_nutrition JSONB               │
 │ is_palm_oil_free  BOOLEAN (tri-state)      │      │ confidence_score FLOAT               │
 │ category          TEXT                     │      │ status           VARCHAR(50)         │
-│ lookup_count      INT NOT NULL DEFAULT 0   │      │ created_at       TIMESTAMPTZ         │
+│ lookup_count      INT NOT NULL DEFAULT 0   │
+│ off_synced_at     TIMESTAMPTZ              │
+│ off_last_modified BIGINT                   │      │ created_at       TIMESTAMPTZ         │
 │ created_at        TIMESTAMPTZ              │      │ updated_at       TIMESTAMPTZ         │
 │ updated_at        TIMESTAMPTZ              │◀─────│ final_product_id UUID FK (nullable)  │
 └────────────────────────────────────────────┘      └──────────────────────────────────────┘
@@ -345,8 +347,13 @@ Notes that matter when querying:
 - **`nutrition_facts`** always carries the same thirteen keys — `energy_kcal`,
   `protein`, `carbs`, `fat`, `saturated_fat`, `trans_fat`, `fiber`, `sugar`,
   `sodium`, `cholesterol`, `potassium`, `calcium`, `iron` — per 100 g, with
-  `sodium` in grams. Values may be `null`; a user-contributed product with no
-  nutrition table stores `{}`.
+  `sodium` in grams. A key we could not find is stored as `null` rather than
+  omitted, so a client can tell "Open Food Facts doesn't publish this" from
+  "we failed to map it". A user-contributed product with no nutrition table
+  stores `{}`.
+- **`off_synced_at` / `off_last_modified`** are how far behind Open Food Facts
+  this row is: when we last brought it in step, and their own last-edited
+  stamp at that moment. `NULL` on rows we sourced ourselves.
 - **`additives`** is a JSON array of E-numbers (`["E150D","E338"]`). `NULL`
   means "the source has no additive data", which is not the same claim as
   "no additives".
@@ -389,6 +396,75 @@ provider ships `pg_trgm` on its allowed list.
 
 ## 📡 API Contract
 
+### Authentication
+
+There are no accounts, so a **device** is the subject. It proves itself with
+a bearer token, not with its identifier:
+
+```
+POST /api/v1/auth/device        (no body, no auth)
+→ { "device_id": "…", "token": "…" }
+```
+
+The token is issued once per install and returned once. Only its SHA-256 is
+stored, so a database leak does not hand over credentials. Every per-user
+endpoint then takes it:
+
+```
+Authorization: Bearer <token>
+```
+
+**The device id never appears in a path or query again.** It previously did,
+which meant anyone holding one could read that person's profile, cancel their
+Plus, or delete their account — and a device identifier is not a secret: iOS
+hands the same one to every app from a vendor, and anything in a URL lands in
+proxy and access logs. The token is the identity, so a caller has no way to
+name anybody but itself. The server, not the client, generates the id, so
+there is nothing to guess or claim.
+
+On the client the token lives in the **Keychain**, which survives deleting the
+app — that is what lets a reinstall keep its profile. A `401` means the row
+behind the token is gone; the client registers afresh and retries once.
+
+| Endpoint | Auth |
+|---|---|
+| `/health*`, `/products/search`, `/query`, `/trending`, `/alternatives` | none |
+| `/products/needs-verification` | optional — a token lets it skip what you already voted on |
+| `/products/verify`, `/ocr/submit`, all of `/me/*` | **required** |
+
+### Rate limits
+
+Per hour, counted in Redis. The subject is the **token** when there is one and
+the **address** otherwise, because mobile networks put thousands of people
+behind one address and limiting everybody by IP would punish a whole carrier
+for one script.
+
+| Bucket | Limit | Subject |
+|---|---|---|
+| Barcode look-up | 600 | device or address |
+| Text search | 200 | device or address |
+| Confirm a label | 60 | device |
+| Add a product | 20 | device |
+| Profile / subscription / link writes | 60 | device |
+| Register a device | 10 | address |
+
+Over the limit returns `429`. The counter is a fixed window incremented and
+expired in one Lua call, so a process dying mid-sequence cannot leave a key
+without a TTL and jam a subject out permanently. It **fails open**: if Redis
+is unreachable the request is allowed and the failure is logged, because this
+limiter exists to blunt abuse and taking the API down when the cache blinks is
+the worse outcome.
+
+`X-Forwarded-For` is believed only when `TRUST_PROXY_HEADERS` is set, meaning
+a proxy that overwrites it sits in front. Otherwise the socket's peer address
+is used, since a caller could otherwise hand us a fresh address per request
+and lift its own limit.
+
+Request bodies are capped at 256 KB, and an OCR submission at 20,000
+characters of recognised text.
+
+
+
 Every response is wrapped in the same envelope:
 
 ```json
@@ -407,11 +483,34 @@ Errors reply `{ "status": "error", "error": "...", "timestamp": "..." }` with a
 
 `GET /api/v1/products/search?barcode=<8–14 digits>&country=IN`
 
-Resolution order is Redis (5 min TTL) → Postgres → Open Food Facts (rate
+Resolution order is Redis (1 hour TTL) → Postgres → Open Food Facts (rate
 limited to 12 req/min across the whole service). A product fetched from Open
 Food Facts is written to Postgres before it is returned, so the second
-look-up is local. Each resolved look-up increments `products.lookup_count`,
+look-up is local. A barcode Open Food Facts doesn't have either is remembered
+as a miss for 10 minutes, so re-scanning an unknown pack doesn't spend the
+shared budget. Each resolved look-up increments `products.lookup_count`,
 which is what `/trending` ranks on.
+
+**Staying in step with Open Food Facts.** Our row is a cache of theirs, not a
+fork of it, and two things keep it honest:
+
+- *One mapping.* Every column we take from a product is produced by a single
+  `OffFields::from`, used by the first insert and by every later refresh.
+  Nutrients go through one table that reads `<nutrient>_100g` first, then the
+  bare key, then `_value`. Every figure this API publishes is per 100 g, so
+  only `_100g` may be trusted — the bare key is historical, is not guaranteed
+  to be normalised, and is often absent entirely.
+- *Refresh on read.* A read of an Open-Food-Facts-sourced row whose
+  `off_synced_at` is more than 30 days old kicks off a background refresh.
+  It is opportunistic: if the per-minute budget has no free slot it gives up
+  rather than queue, because a refresh is never the urgent request and a live
+  scan is. The reader is served the existing row either way.
+
+A refresh rewrites only the columns Open Food Facts owns. `verified`,
+`verification_count` and `lookup_count` are ours and are never overwritten,
+and a `user_contributed` row is never touched at all. `off_last_modified`
+records their own last-edited stamp at the moment we synced, so "are we in
+step with them" is answerable without re-reading the product.
 
 ```json
 {
@@ -430,14 +529,26 @@ which is what `/trending` ranks on.
       "sugar": 2.4, "sodium": 1.18, "cholesterol": null,
       "potassium": null, "calcium": null, "iron": null
     },
+    "nutrition_per_serving": { "energy_kcal": 163.8, "sugar": 0.72, "…": null },
+    "nutrient_levels": { "fat": "high", "saturated_fat": "high", "sugar": "low", "sodium": "high" },
+    "serving_size": "30 g",
+    "serving_quantity": 30,
+    "quantity": "200 g",
     "ingredients": "Gram flour, edible vegetable oil (palm), potato, salt…",
-    "allergens": "en:peanuts",
+    "allergens": ["peanuts"],
+    "traces": ["tree-nuts"],
+    "labels": ["vegetarian", "no-added-sugar"],
+    "additives": ["E330", "E500II"],
+    "categories": ["snacks", "salty-snacks", "namkeen"],
     "source": "open_food_facts",
     "verified": false,
     "verification_count": 1,
-    "additives": ["E330", "E500II"],
+    "off_synced_at": "2026-09-13T10:00:00Z",
+    "completeness": 0.85,
     "nova_group": 4,
     "nutriscore_grade": "d",
+    "nutriscore_score": 18,
+    "ecoscore_grade": "d",
     "is_vegan": true,
     "is_vegetarian": true,
     "is_palm_oil_free": false,
@@ -446,9 +557,33 @@ which is what `/trending` ranks on.
 }
 ```
 
-Every nutrient is **per 100 g**, and `sodium` is in **grams** (Open Food Facts'
-convention), not milligrams. The three dietary flags are deliberately
-tri-state: `null` means the source has no definitive answer, never "no".
+Everything in `nutrition_facts` is **per 100 g**, and `sodium` is in **grams**
+(Open Food Facts' convention), not milligrams. `nutrition_per_serving` is the
+same document scaled by `serving_quantity` — arithmetic only, and absent
+rather than guessed when the pack states no serving size.
+
+`nutrient_levels` is `low` / `moderate` / `high` per nutrient. It is Open
+Food Facts' own where they publish one, and the UK FSA front-of-pack
+thresholds where they do not — with the separate drinks thresholds applied
+when the product is a beverage, because 12 g of sugar is moderate in a
+biscuit and high in a bottle.
+
+**Three-valued fields, throughout.** The dietary flags, `allergens`,
+`traces`, `labels`, `additives` and `categories` are all `null` when the
+source publishes nothing and `[]` / `false` when it publishes "none". Those
+are different claims to make about food and must never be collapsed.
+`traces` is the "may contain" line and is kept apart from `allergens` on
+purpose: a trace is not an ingredient, and for an allergy it is often the
+line that decides it.
+
+Tags travel as **slugs with the locale prefix stripped** — `"tree-nuts"`,
+not `"en:tree-nuts"` and not `"Tree Nuts"`. A slug can be both matched on and
+prettified; a display string can only be shown.
+
+Nutrient figures are sanity-checked before storage: anything negative, or
+above 100 g per 100 g, or above 900 kcal per 100 g, is dropped rather than
+stored. Open Food Facts is crowd-edited and does contain data-entry errors,
+and rendering one is worse than rendering nothing.
 
 ---
 
@@ -514,10 +649,11 @@ wrong one.
 
 ### 5. Verification queue
 
-`GET /api/v1/products/needs-verification?country=IN&device_id=<uuid>&limit=12`
+`GET /api/v1/products/needs-verification?country=IN&limit=12`
 
 Products below the 3-confirmation threshold that this device hasn't already
-voted on. Omitting `device_id` skips the exclusion rather than failing.
+voted on. Works without a token; sending one is what lets it skip what you
+have already voted on.
 
 ```json
 {
@@ -545,8 +681,10 @@ voted on. Omitting `device_id` skips the exclusion rather than failing.
 `POST /api/v1/products/verify`
 
 ```json
-{ "barcode": "8901030895564", "country": "IN", "device_id": "9B1D6F20-…" }
+{ "barcode": "8901030895564", "country": "IN" }
 ```
+
+Who is confirming comes from the token, never from the body.
 
 Records a row in `verifications`, increments `products.verification_count`,
 flips `verified` to true at 3, busts the product's cache entry, and returns the
@@ -556,7 +694,7 @@ refreshed product in the standard envelope.
 
 ### 7. Profile
 
-`GET /api/v1/users/{device_id}/profile?country=IN`
+`GET /api/v1/me/profile`
 
 There are no accounts. `identifierForVendor` is the identity, and **reading a
 profile creates it**, so the client never needs a registration step. `country`
@@ -575,7 +713,7 @@ seeds the row on first read and is ignored afterwards.
 }
 ```
 
-`PUT /api/v1/users/{device_id}/profile`
+`PUT /api/v1/me/profile`
 
 ```json
 { "country": "IN", "dietary_preferences": ["Vegetarian", "Low sugar"], "display_name": "Tarun" }
@@ -589,16 +727,34 @@ Every field is optional — absent means "leave it alone", so country can
 change without resending the preference list. The backend does not own the
 preference vocabulary (the app does, and it grows), so entries are stored as
 given, but trimmed, de-duplicated, and capped at 32 entries of 64 characters
-so one client cannot write an unbounded blob into a shared table. `device_id`
-must be 8–128 characters of `[A-Za-z0-9_-]`.
+so one client cannot write an unbounded blob into a shared table. 
 
 ---
 
-### 8. Subscription
+### 8. Contribution stats
 
-`GET /api/v1/users/{device_id}/subscription`
-`POST /api/v1/users/{device_id}/subscription` — activate
-`DELETE /api/v1/users/{device_id}/subscription` — cancel
+`GET /api/v1/me/stats`
+
+```json
+{ "confirmations": 12, "contributions": 3, "helped_verify": 5, "member_since": "2026-09-13T09:12:00Z" }
+```
+
+Deliberately about **contribution, not consumption**. How much someone scans
+never leaves their phone; what they put into the shared catalogue is the only
+thing counted here. `helped_verify` is the subset of their confirmations that
+sit on products which have since crossed the threshold and are now verified
+for everyone — the number worth showing a person.
+
+All three come back in one round trip, because three separate counts on a
+profile screen is three chances to be half-loaded.
+
+---
+
+### 9. Subscription
+
+`GET /api/v1/me/subscription`
+`POST /api/v1/me/subscription` — activate
+`DELETE /api/v1/me/subscription` — cancel
 
 ```json
 { "tier": "plus", "active": true, "since": "2026-09-13T10:00:00Z", "expires_at": null, "source": "complimentary" }
@@ -620,7 +776,7 @@ sufficient for Plus, so that switch needs no client change either.
 
 ---
 
-### 9. Sign in, sign out, delete
+### 10. Sign in, sign out, delete
 
 > **Sign in with Apple needs a paid Apple Developer Program team.** A personal
 > team cannot create a provisioning profile that declares the entitlement, so
@@ -632,7 +788,7 @@ sufficient for Plus, so that switch needs no client change either.
 > a build starts sending them, so enabling the capability is a client-only
 > change. See `truelable.entitlements` for the two switches.
 
-`POST /api/v1/users/{device_id}/link`
+`POST /api/v1/me/link`
 
 ```json
 { "identity_token": "<Apple identity token>", "display_name": "Tarun Vishwakarma" }
@@ -655,11 +811,11 @@ If that Apple identity already owns a row on another device, the account
 that phone reverts to anonymous. One active device per account. There is no
 cross-device sync, so anything else would silently duplicate an entitlement.
 
-`POST /api/v1/users/{device_id}/unlink` detaches the identity and keeps the
+`POST /api/v1/me/unlink` detaches the identity and keeps the
 row, which is what signing out should do — the app keeps working and nothing
 is destroyed.
 
-`DELETE /api/v1/users/{device_id}` deletes the account for real, not a
+`DELETE /api/v1/me/account` deletes the account for real, not a
 deactivation flag. The App Store requires any app that creates accounts to
 offer this from inside the app. Verifications the device submitted are left
 alone: they carry no identity beyond a device id, and removing them would
@@ -675,7 +831,7 @@ The profile response carries an `identity` block alongside `subscription`:
 
 ---
 
-### 10. Submit a label read on-device
+### 11. Submit a label read on-device
 
 `POST /api/v1/ocr/submit`
 
@@ -695,7 +851,8 @@ untouched recognized text alongside what the user confirmed after reviewing it.
 }
 ```
 
-`product_name`, `brand` and `nutrition` are optional — older clients send only
+The contribution is attributed to the token's device, so it can be counted
+back on the profile screen. `product_name`, `brand` and `nutrition` are optional — older clients send only
 the ingredient side. `extracted_text` is kept as the audit trail: the server
 re-parses it and compares against the reviewed fields, so a submission that
 silently drops an allergen OCR clearly found is stored
