@@ -104,7 +104,7 @@ enum ProductAPIClient {
     /// legitimate, expected outcome.
     static func fetchNeedsVerification(limit: Int = 10) async throws -> [VerificationCandidate] {
         let country = currentCountry()
-        let deviceID = await UIDevice.current.identifierForVendor?.uuidString
+        let deviceID = UIDevice.current.identifierForVendor?.uuidString
 
         var components = URLComponents(
             url: APIEnvironment.baseURL.appendingPathComponent("/api/v1/products/needs-verification"),
