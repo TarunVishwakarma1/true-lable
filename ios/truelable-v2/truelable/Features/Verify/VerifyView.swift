@@ -35,7 +35,6 @@ struct VerifyView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background { Backdrop() }
             .screenBackground()
             .navigationTitle("Verify")
             .toolbar {

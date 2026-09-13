@@ -30,32 +30,34 @@ struct ProductScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                hero
-                VerdictCard(product: product)
-                if !checks.isEmpty {
-                    ForYouCard(checks: checks)
+            GlassEffectContainer(spacing: 14) {
+                VStack(spacing: 14) {
+                    hero
+                    VerdictCard(product: product)
+                    if !checks.isEmpty {
+                        ForYouCard(checks: checks)
+                    }
+                    MacroCard(product: product)
+                    if let sugar = product.nutrition.sugar {
+                        SugarCard(sugarGrams: sugar)
+                    }
+                    if !product.nutrition.isEmpty {
+                        LabelCard(product: product)
+                    }
+                    if let ingredients = product.ingredients {
+                        IngredientsCard(text: ingredients)
+                    }
+                    if !product.additives.isEmpty {
+                        AdditivesCard(codes: product.additives)
+                    }
+                    if let allergens = product.allergens {
+                        AllergensCard(raw: allergens)
+                    }
+                    AlternativesCard(product: product, prefs: DietaryPreference.decode(dietaryRaw))
+                    CommunityCard(product: $product)
+                    compareCard
+                    footer
                 }
-                MacroCard(product: product)
-                if let sugar = product.nutrition.sugar {
-                    SugarCard(sugarGrams: sugar)
-                }
-                if !product.nutrition.isEmpty {
-                    LabelCard(product: product)
-                }
-                if let ingredients = product.ingredients {
-                    IngredientsCard(text: ingredients)
-                }
-                if !product.additives.isEmpty {
-                    AdditivesCard(codes: product.additives)
-                }
-                if let allergens = product.allergens {
-                    AllergensCard(raw: allergens)
-                }
-                AlternativesCard(product: product, prefs: DietaryPreference.decode(dietaryRaw))
-                CommunityCard(product: $product)
-                compareCard
-                footer
             }
             .padding(.horizontal, TL.gutter)
             .padding(.top, 8)
@@ -216,14 +218,14 @@ struct ComparePickerSheet: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .listRowBackground(TL.bg)
+                                .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(TL.line)
                             }
                         } header: {
                             Text(plus.isActive ? "Pick up to three" : "Pick one · Plus compares four")
                         }
                         if !plus.isActive {
-                            PlusGate(text: "Compare up to four at once").listRowBackground(TL.bg)
+                            PlusGate(text: "Compare up to four at once").listRowBackground(Color.clear)
                         }
                     }
                     .listStyle(.plain)

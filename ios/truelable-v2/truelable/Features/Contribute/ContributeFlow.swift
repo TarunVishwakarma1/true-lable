@@ -416,6 +416,6 @@ private struct ReviewStep: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(TL.elevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

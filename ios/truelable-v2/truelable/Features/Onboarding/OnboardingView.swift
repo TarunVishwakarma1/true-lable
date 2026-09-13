@@ -17,9 +17,6 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            TL.bg.ignoresSafeArea()
-            Backdrop()
-
             VStack(spacing: 0) {
                 TabView(selection: $page) {
                     welcome.tag(0)
@@ -44,6 +41,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 24)
             }
         }
+        .screenBackground()
         .sensoryFeedback(.selection, trigger: page)
     }
 
@@ -157,10 +155,10 @@ struct DietaryChips: View {
                             .font(.subheadline.weight(on ? .semibold : .regular))
                     }
                     .foregroundStyle(on ? TL.ink : TL.fg)
+                    .engraved(0.6)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(on ? TL.accent : TL.elevated, in: Capsule())
-                    .overlay(Capsule().strokeBorder(on ? Color.clear : TL.line))
+                    .glassEffect(on ? .regular.tint(TL.accent).interactive() : .regular.interactive(), in: .capsule)
                 }
                 .buttonStyle(.pressable)
                 .accessibilityAddTraits(on ? .isSelected : [])
@@ -195,43 +193,6 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             row = max(row, size.height)
         }
-    }
-}
-
-/// Static brand mark — a barcode with two accent bars.
-struct BarcodeGlyph: View {
-    var body: some View {
-        HStack(alignment: .center, spacing: 5) {
-            ForEach(Array([4.0, 8, 3, 10, 3, 6, 3, 8].enumerated()), id: \.offset) { i, w in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(i == 1 || i == 5 ? TL.accent : TL.fg)
-                    .frame(width: w)
-            }
-        }
-    }
-}
-
-/// Static mesh — rich, and free at runtime because nothing animates.
-struct Backdrop: View {
-    var intensity: Double = 1
-
-    var body: some View {
-        MeshGradient(
-            width: 3, height: 3,
-            points: [
-                [0, 0], [0.5, 0], [1, 0],
-                [0, 0.5], [0.55, 0.45], [1, 0.5],
-                [0, 1], [0.5, 1], [1, 1]
-            ],
-            colors: [
-                TL.bg, TL.bg, Color(hex: 0x0E1F1A),
-                TL.bg, Color(hex: 0x0C1A16), TL.bg,
-                Color(hex: 0x101018), TL.bg, TL.bg
-            ]
-        )
-        .opacity(intensity)
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
     }
 }
 

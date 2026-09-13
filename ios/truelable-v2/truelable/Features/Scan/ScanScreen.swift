@@ -44,7 +44,6 @@ struct ScanScreen: View {
                     .transition(.opacity)
             } else {
                 ZStack {
-                    Backdrop().ignoresSafeArea()
                     if authorized != nil { chrome }
                 }
                 .screenBackground()
@@ -235,9 +234,9 @@ struct ScanScreen: View {
             Button("Keep scanning") { qr = nil }
                 .buttonStyle(.primary)
         }
+        .engraved()
         .padding(22)
-        .background(TL.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(TL.line))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 28)
     }
 
@@ -338,8 +337,8 @@ struct ManualEntrySheet: View {
                     .font(.system(.title2, design: .monospaced).weight(.semibold))
                     .focused($focused)
                     .padding(18)
-                    .background(TL.elevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(valid ? TL.accent : TL.line))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(valid ? TL.accent : .clear))
                     .onChange(of: code) { _, new in
                         let filtered = String(new.filter(\.isNumber).prefix(13))
                         if filtered != new { code = filtered }

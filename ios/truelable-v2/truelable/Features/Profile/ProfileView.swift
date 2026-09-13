@@ -8,6 +8,7 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct ProfileView: View {
     @Query private var records: [ScanRecord]
@@ -16,6 +17,7 @@ struct ProfileView: View {
     @AppStorage(Keys.dietary) private var dietaryRaw = ""
     @State private var confirmClear = false
     @State private var showingPlus = false
+    @State private var trendWindow = 7
     private let plus = Plus.shared
 
     private var prefs: Set<DietaryPreference> { DietaryPreference.decode(dietaryRaw) }
@@ -23,17 +25,19 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    stats
-                    plusCard
-                    watchFor
-                    about
-                    data
+                GlassEffectContainer(spacing: 24) {
+                    VStack(spacing: 24) {
+                        stats
+                        if !records.isEmpty { trends }
+                        plusCard
+                        watchFor
+                        about
+                        data
+                    }
                 }
                 .padding(.horizontal, TL.gutter)
                 .padding(.bottom, 32)
             }
-            .background { Backdrop() }
             .screenBackground()
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
@@ -45,6 +49,86 @@ struct ProfileView: View {
             }
         } message: {
             Text("This only removes the list on this phone. Community verifications you made stay counted.")
+        }
+    }
+
+    // MARK: Trends
+
+    private var windowDays: [(date: Date, count: Int)] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        return (0..<trendWindow).reversed().map { offset in
+            let day = cal.date(byAdding: .day, value: -offset, to: today)!
+            return (day, records.filter { cal.isDate($0.scannedAt, inSameDayAs: day) }.count)
+        }
+    }
+
+    private var windowRecords: [ScanRecord] {
+        let start = Calendar.current.date(byAdding: .day, value: -(trendWindow - 1), to: Calendar.current.startOfDay(for: .now))!
+        return records.filter { $0.scannedAt >= start }
+    }
+
+    private var trends: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                SectionHeader(title: "Your trends")
+                Picker("Window", selection: $trendWindow) {
+                    Text("7d").tag(7)
+                    Text("30d").tag(30)
+                    Text("90d").tag(90)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 150)
+                .disabled(!plus.isActive)
+            }
+            if !plus.isActive {
+                PlusGate(text: "30 and 90-day trends need Plus")
+            }
+            Chart(windowDays, id: \.date) { day in
+                BarMark(x: .value("Day", day.date, unit: .day), y: .value("Products", day.count))
+                    .foregroundStyle(day.count > 0 ? TL.accent : Color.white.opacity(0.1))
+                    .cornerRadius(3)
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: trendWindow == 7 ? 1 : trendWindow / 6)) { _ in
+                    AxisValueLabel(format: trendWindow == 7 ? .dateTime.weekday(.narrow) : .dateTime.day(), centered: trendWindow == 7)
+                        .foregroundStyle(TL.fg3)
+                }
+            }
+            .chartYAxis(.hidden)
+            .frame(height: 96)
+            .animation(.tl(0.4), value: trendWindow)
+
+            if let sugar = average(\.sugarGrams) {
+                gauge("Avg. sugar per product", sugar, of: 50, unit: "g", color: TL.warn)
+            }
+            if let sodium = average(\.sodiumMg) {
+                gauge("Avg. sodium per product", sodium, of: 2000, unit: "mg", color: TL.danger)
+            }
+            Text("Per-100 g averages of the last \(trendWindow) days against WHO free-sugar (50 g/day) and ICMR sodium (2,000 mg/day) guidelines.")
+                .font(.caption2)
+                .foregroundStyle(TL.fg3)
+        }
+        .card()
+    }
+
+    private func average(_ key: KeyPath<ScanRecord, Double?>) -> Double? {
+        let values = windowRecords.compactMap { $0[keyPath: key] }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private func gauge(_ label: String, _ value: Double, of guideline: Double, unit: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(label).font(.footnote.weight(.medium))
+                Spacer()
+                Text("\(value.compact) \(unit) · \(Int((value / guideline * 100).rounded()))% of daily")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(TL.fg3)
+            }
+            BarMeter(fraction: value / guideline, color: color)
         }
     }
 

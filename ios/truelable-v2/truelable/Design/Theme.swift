@@ -92,33 +92,60 @@ extension Font {
 }
 
 extension View {
-    /// Opaque surface card: fill, a top sheen, a gradient hairline and a
-    /// soft drop. Opaque on purpose — no live backdrop sampling anywhere in
-    /// scrolling content, which is what keeps long pages at a steady frame
-    /// rate.
+    /// Text and icons cut into the surface: a dark groove above each glyph
+    /// and a lit lip below it. Applied once per card subtree — nesting it
+    /// doubles the effect and reads as a blur.
+    func engraved(_ strength: Double = 1) -> some View {
+        shadow(color: .black.opacity(0.55 * strength), radius: 1, y: -0.5)
+            .shadow(color: .white.opacity(0.16 * strength), radius: 0, y: 1)
+    }
+
+    /// Every surface in the app. `fill` tints the glass rather than hiding
+    /// what is behind it.
     func card(radius: CGFloat = TL.radius, fill: Color = TL.surface, padding: CGFloat = 20) -> some View {
+        modifier(GlassCard(radius: radius, tint: fill, padding: padding))
+    }
+
+    /// The ground every screen stands on: a flat base, then the static
+    /// mesh the glass surfaces refract.
+    func screenBackground() -> some View {
+        background { Backdrop() }
+            .background(TL.bg.ignoresSafeArea())
+    }
+}
+
+/// ponytail: one glass layer per card, no GlassEffectContainer. Group them
+/// in a container if a screen ever shows enough cards at once to drop frames.
+private struct GlassCard: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    var radius: CGFloat
+    var tint: Color
+    var padding: CGFloat
+
+    func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        return self
+        let inner = content
+            .engraved()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fill, in: shape)
-            .overlay {
-                shape.fill(LinearGradient(colors: [.white.opacity(0.06), .clear], startPoint: .top, endPoint: .center))
+
+        if reduceTransparency {
+            inner
+                .background(tint, in: shape)
+                .overlay(shape.strokeBorder(TL.line))
+        } else {
+            inner
+                .glassEffect(.regular.tint(tint.opacity(0.45)), in: shape)
+                .overlay {
+                    shape.strokeBorder(
+                        LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.04)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 1
+                    )
                     .allowsHitTesting(false)
-            }
-            .overlay {
-                shape.strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1
-                )
-            }
-            .shadow(color: .black.opacity(0.28), radius: 14, y: 8)
+                }
+        }
     }
-
-    func screenBackground() -> some View {
-        background(TL.bg.ignoresSafeArea())
-    }
-
 }
 
 // MARK: - Formatting

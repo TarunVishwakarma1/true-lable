@@ -111,7 +111,7 @@ struct HistoryView: View {
                 Section {
                     ForEach(group.records) { record in
                         row(record)
-                            .listRowBackground(TL.bg)
+                            .listRowBackground(Color.clear)
                             .listRowSeparatorTint(TL.line)
                             .swipeActions(edge: .trailing) {
                                 if !compareMode {
@@ -191,7 +191,7 @@ struct HistoryView: View {
         }
         .padding(.horizontal, TL.gutter)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .background(.regularMaterial)
         .animation(.tl(0.3), value: selected.count)
     }
 

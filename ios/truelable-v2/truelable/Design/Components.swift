@@ -14,6 +14,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .foregroundStyle(TL.ink)
+            .engraved(0.6)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(TL.accentGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -28,10 +29,10 @@ struct SecondaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .foregroundStyle(TL.fg)
+            .engraved()
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(TL.elevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(TL.line))
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.tl(0.25), value: configuration.isPressed)
     }
@@ -119,9 +120,10 @@ struct Pill: View {
             Text(text).font(.caption.weight(.semibold))
         }
         .foregroundStyle(filled ? TL.ink : color)
+        .engraved(0.5)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(filled ? color : color.opacity(0.14), in: Capsule())
+        .background(filled ? color : color.opacity(0.18), in: Capsule())
     }
 }
 
@@ -244,9 +246,9 @@ struct ProductThumb: View {
             }
         }
         .frame(width: size, height: size)
-        .background(Color.white)
+        .background(.white.opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(TL.line))
+        .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(.white.opacity(0.18)))
     }
 
     private var placeholder: some View {
@@ -280,38 +282,7 @@ struct Skeleton: View {
     }
 }
 
-// MARK: - Product cards (search, trending, alternatives, compare picker)
-
-/// Vertical card for horizontal strips.
-struct ProductCardTile: View {
-    let card: ProductCard
-    var caption: String? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                ProductThumb(url: card.imageURL, size: 132, radius: 18)
-                    .frame(maxWidth: .infinity)
-                if let grade = card.nutriscoreGrade {
-                    GradeBadge(grade: grade).padding(8)
-                }
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(card.productName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(minHeight: 36, alignment: .top)
-                Text(caption ?? card.brand ?? " ")
-                    .font(.caption)
-                    .foregroundStyle(caption == nil ? TL.fg3 : TL.accent)
-                    .lineLimit(1)
-            }
-        }
-        .frame(width: 132)
-        .card(radius: 24, padding: 12)
-    }
-}
+// MARK: - Product card row (search, trending, alternatives)
 
 /// Horizontal row for lists.
 struct ProductCardRow: View {
@@ -356,6 +327,7 @@ struct GradeBadge: View {
         Text(grade.uppercased())
             .font(.system(size: size * 0.5, weight: .heavy))
             .foregroundStyle(TL.ink)
+            .engraved(0.5)
             .frame(width: size, height: size)
             .background(TL.grade(grade), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
             .accessibilityLabel("Nutri-Score \(grade.uppercased())")
@@ -374,3 +346,45 @@ struct PlusTag: View {
             .background(TL.accentGradient, in: Capsule())
     }
 }
+
+// MARK: - Brand
+
+/// Static brand mark — a barcode with two accent bars.
+struct BarcodeGlyph: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 5) {
+            ForEach(Array([4.0, 8, 3, 10, 3, 6, 3, 8].enumerated()), id: \.offset) { i, w in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(i == 1 || i == 5 ? TL.accent : TL.fg)
+                    .frame(width: w)
+            }
+        }
+    }
+}
+
+/// Static mesh — free at runtime because nothing animates, and the only
+/// thing the glass surfaces have to refract. Flat black behind glass just
+/// looks like flat black.
+struct Backdrop: View {
+    var intensity: Double = 1
+
+    var body: some View {
+        MeshGradient(
+            width: 3, height: 3,
+            points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [0.55, 0.45], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1]
+            ],
+            colors: [
+                Color(hex: 0x0A0B0D), Color(hex: 0x0C1512), Color(hex: 0x15382E),
+                Color(hex: 0x0A0B0D), Color(hex: 0x112620), Color(hex: 0x0D1B24),
+                Color(hex: 0x161129), Color(hex: 0x0A0B0D), Color(hex: 0x0A0B0D)
+            ]
+        )
+        .opacity(intensity)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+

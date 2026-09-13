@@ -52,7 +52,7 @@ struct SearchScreen: View {
                             .font(.subheadline)
                             .foregroundStyle(TL.fg)
                     }
-                    .listRowBackground(TL.bg)
+                    .listRowBackground(Color.clear)
                 }
                 .onDelete { offsets in
                     var r = recents
@@ -67,7 +67,7 @@ struct SearchScreen: View {
             Section {
                 ForEach(trending) { card in
                     NavigationLink(value: card.barcode) { ProductCardRow(card: card) }
-                        .listRowBackground(TL.bg)
+                        .listRowBackground(Color.clear)
                         .listRowSeparatorTint(TL.line)
                 }
             } header: {
@@ -83,7 +83,7 @@ struct SearchScreen: View {
                 Label("Look up barcode \(trimmed)", systemImage: "barcode.viewfinder")
                     .font(.subheadline.weight(.semibold))
             }
-            .listRowBackground(TL.bg)
+            .listRowBackground(Color.clear)
         }
         if searching && results.isEmpty {
             ForEach(0..<4, id: \.self) { _ in
@@ -91,7 +91,7 @@ struct SearchScreen: View {
                     RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)).frame(width: 56, height: 56)
                     Skeleton(lines: 2)
                 }
-                .listRowBackground(TL.bg)
+                .listRowBackground(Color.clear)
             }
         } else if failed {
             ContentUnavailableView("Couldn't search", systemImage: "wifi.slash", description: Text("Check your connection and try again."))
@@ -104,7 +104,7 @@ struct SearchScreen: View {
                 NavigationLink(value: card.barcode) {
                     ProductCardRow(card: card)
                 }
-                .listRowBackground(TL.bg)
+                .listRowBackground(Color.clear)
                 .listRowSeparatorTint(TL.line)
                 .simultaneousGesture(TapGesture().onEnded { remember(trimmed) })
             }
