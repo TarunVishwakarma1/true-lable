@@ -363,6 +363,7 @@ private struct ReviewStep: View {
             .padding(24)
         }
         .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private var assembled: LabelOCR.Draft {

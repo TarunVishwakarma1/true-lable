@@ -36,6 +36,7 @@ struct ProfileView: View {
             .background { Backdrop() }
             .screenBackground()
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("You")
         }
         .confirmationDialog("Clear scan history?", isPresented: $confirmClear, titleVisibility: .visible) {

@@ -112,11 +112,12 @@ struct LiveTextReader<Overlay: View>: UIViewControllerRepresentable {
         controller.addChild(hosting)
         controller.view.addSubview(hosting.view)
         hosting.view.translatesAutoresizingMaskIntoConstraints = false
+        let guide = controller.view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            hosting.view.topAnchor.constraint(equalTo: controller.view.topAnchor),
-            hosting.view.bottomAnchor.constraint(equalTo: controller.view.bottomAnchor),
-            hosting.view.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor),
-            hosting.view.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor)
+            hosting.view.topAnchor.constraint(equalTo: guide.topAnchor),
+            hosting.view.bottomAnchor.constraint(equalTo: guide.bottomAnchor),
+            hosting.view.leadingAnchor.constraint(equalTo: guide.leadingAnchor),
+            hosting.view.trailingAnchor.constraint(equalTo: guide.trailingAnchor)
         ])
         hosting.didMove(toParent: controller)
         context.coordinator.hosting = hosting

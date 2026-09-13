@@ -392,7 +392,6 @@ struct AlternativesCard: View {
                 }
             }
             .card()
-            .reveal()
             .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
         // Rendered even when empty so the task still runs.

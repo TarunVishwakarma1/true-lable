@@ -65,7 +65,7 @@ struct ScanScreen: View {
                 ProductLoaderScreen(barcode: item.barcode, inSheet: true)
                     .navigationDestination(for: String.self) { ProductLoaderScreen(barcode: $0) }
             }
-            .presentationDetents([.fraction(0.62), .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationBackground(TL.bg)
             .presentationCornerRadius(32)

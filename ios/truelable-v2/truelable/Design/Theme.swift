@@ -119,15 +119,6 @@ extension View {
         background(TL.bg.ignoresSafeArea())
     }
 
-    /// Cards ease in as they scroll into view. Opacity + tiny scale only,
-    /// which the compositor handles without re-rendering the card.
-    func reveal() -> some View {
-        scrollTransition(.animated(.tl(0.5))) { content, phase in
-            content
-                .opacity(phase.isIdentity ? 1 : 0.35)
-                .scaleEffect(phase.isIdentity ? 1 : 0.97)
-        }
-    }
 }
 
 // MARK: - Formatting

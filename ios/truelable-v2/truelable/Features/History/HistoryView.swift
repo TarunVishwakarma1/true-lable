@@ -19,7 +19,6 @@ struct HistoryView: View {
     @State private var compareMode = false
     @State private var selected: Set<String> = []
     @State private var comparing: [ScanRecord] = []
-    @Namespace private var zoom
     private let plus = Plus.shared
     private var compareLimit: Int { plus.isActive ? 4 : Plus.freeCompareLimit }
 
@@ -53,7 +52,6 @@ struct HistoryView: View {
             .navigationTitle("History")
             .navigationDestination(for: String.self) { barcode in
                 ProductLoaderScreen(barcode: barcode, initial: records.first { $0.barcode == barcode }?.product)
-                    .navigationTransition(.zoom(sourceID: barcode, in: zoom))
             }
             .toolbar {
                 if !records.isEmpty {
@@ -140,7 +138,6 @@ struct HistoryView: View {
                 .buttonStyle(.plain)
         } else {
             NavigationLink(value: record.barcode) { rowBody(record) }
-                .matchedTransitionSource(id: record.barcode, in: zoom)
         }
     }
 

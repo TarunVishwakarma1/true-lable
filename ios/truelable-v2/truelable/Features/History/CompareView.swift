@@ -29,6 +29,7 @@ struct CompareView: View {
                 }
                 .padding(TL.gutter)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .screenBackground()
             .navigationTitle("Compare")
             .navigationBarTitleDisplayMode(.inline)

@@ -20,7 +20,6 @@ struct HomeView: View {
     @State private var queueCount: Int?
     @State private var trending: [ProductCard] = []
     @State private var trendWindow = 7
-    @Namespace private var zoom
     private let plus = Plus.shared
 
     var body: some View {
@@ -33,22 +32,21 @@ struct HomeView: View {
                     if !records.isEmpty { recents }
                     if !trending.isEmpty { popular }
                     if !records.isEmpty { week }
-                    if !plus.isActive { PlusBanner().reveal() }
+                    if !plus.isActive { PlusBanner() }
                     verifyNudge
                     if DietaryPreference.decode(dietaryRaw).isEmpty { preferencesNudge }
                 }
                 .padding(.horizontal, TL.gutter)
-                .padding(.top, 4)
+                .padding(.top, 8)
                 .padding(.bottom, 32)
             }
             .background { Backdrop() }
             .screenBackground()
             .scrollIndicators(.hidden)
-            .navigationTitle("TrueLabel")
-            .navigationBarTitleDisplayMode(.large)
+            .scrollBounceBehavior(.basedOnSize)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { barcode in
                 ProductLoaderScreen(barcode: barcode, initial: records.first { $0.barcode == barcode }?.product)
-                    .navigationTransition(.zoom(sourceID: barcode, in: zoom))
             }
             .task {
                 async let queue = API.needsVerification(limit: 12)
@@ -63,36 +61,26 @@ struct HomeView: View {
     // MARK: Hero
 
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Eyebrow(text: greeting)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                BarcodeGlyph()
+                    .frame(width: 34, height: 22)
+                Text("TrueLabel")
+                    .font(.headline)
                 Spacer()
                 Pill(text: API.country, color: TL.fg2, icon: "globe")
             }
+            Eyebrow(text: greeting)
             Text("What's really\nin it?")
-                .font(.display(42))
-                .tracking(-1)
-                .lineSpacing(-4)
+                .font(.display(36))
+                .tracking(-0.8)
+                .lineSpacing(-3)
             Text("Point at a barcode. Sugar in teaspoons, additives by name, and whether it fits how you eat.")
                 .font(.subheadline)
                 .foregroundStyle(TL.fg2)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Button {
-                router.scannerPresented = true
-            } label: {
-                Label("Scan a barcode", systemImage: "barcode.viewfinder")
-            }
-            .buttonStyle(.primary)
         }
-        .card(radius: 30, fill: TL.surface, padding: 24)
-        .background {
-            // One warm accent glow bleeding out of the hero — static.
-            RadialGradient(colors: [TL.accent.opacity(0.22), .clear], center: .topTrailing, startRadius: 0, endRadius: 320)
-                .blur(radius: 30)
-                .offset(x: 40, y: -60)
-                .allowsHitTesting(false)
-        }
+        .card(radius: 30, fill: TL.surface, padding: 22)
     }
 
     private var greeting: String {
@@ -105,35 +93,42 @@ struct HomeView: View {
     }
 
     private var searchBar: some View {
-        NavigationLink {
-            SearchScreen()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
+        HStack(spacing: 10) {
+            NavigationLink {
+                SearchScreen()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(TL.fg2)
+                    Text("Search a product or brand")
+                        .font(.subheadline)
+                        .foregroundStyle(TL.fg3)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(TL.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(TL.line))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.pressable)
+
+            Button {
+                router.manualEntryPresented = true
+            } label: {
+                Image(systemName: "keyboard")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(TL.fg2)
-                Text("Search a product or brand")
-                    .font(.subheadline)
-                    .foregroundStyle(TL.fg3)
-                Spacer()
-                Button {
-                    router.manualEntryPresented = true
-                } label: {
-                    Image(systemName: "keyboard")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(TL.fg2)
-                        .frame(width: 32, height: 32)
-                        .background(TL.elevated, in: Circle())
-                }
-                .buttonStyle(.pressable)
-                .accessibilityLabel("Type a barcode")
+                    .frame(width: 54, height: 54)
+                    .background(TL.surface, in: Circle())
+                    .overlay(Circle().strokeBorder(TL.line))
+                    .contentShape(Circle())
             }
-            .padding(.horizontal, 16)
-            .frame(height: 54)
-            .background(TL.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(TL.line))
+            .buttonStyle(.pressable)
+            .accessibilityLabel("Type a barcode")
         }
-        .buttonStyle(.pressable)
     }
 
     // MARK: Stats
@@ -165,16 +160,11 @@ struct HomeView: View {
                     ForEach(records.prefix(8)) { record in
                         NavigationLink(value: record.barcode) { RecentCard(record: record) }
                             .buttonStyle(.pressable)
-                            .matchedTransitionSource(id: record.barcode, in: zoom)
                     }
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
-        .reveal()
     }
 
     private var popular: some View {
@@ -187,13 +177,9 @@ struct HomeView: View {
                             .buttonStyle(.pressable)
                     }
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
-        .reveal()
     }
 
     // MARK: Trends
@@ -254,7 +240,6 @@ struct HomeView: View {
                 .foregroundStyle(TL.fg3)
         }
         .card()
-        .reveal()
     }
 
     private func average(_ key: KeyPath<ScanRecord, Double?>) -> Double? {
@@ -312,7 +297,6 @@ struct HomeView: View {
             .card(radius: 20, padding: 14)
         }
         .buttonStyle(.pressable)
-        .reveal()
     }
 }
 

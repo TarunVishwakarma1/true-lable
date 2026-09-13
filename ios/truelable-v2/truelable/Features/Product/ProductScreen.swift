@@ -32,29 +32,29 @@ struct ProductScreen: View {
         ScrollView {
             VStack(spacing: 14) {
                 hero
-                VerdictCard(product: product).reveal()
+                VerdictCard(product: product)
                 if !checks.isEmpty {
-                    ForYouCard(checks: checks).reveal()
+                    ForYouCard(checks: checks)
                 }
-                MacroCard(product: product).reveal()
+                MacroCard(product: product)
                 if let sugar = product.nutrition.sugar {
-                    SugarCard(sugarGrams: sugar).reveal()
+                    SugarCard(sugarGrams: sugar)
                 }
                 if !product.nutrition.isEmpty {
-                    LabelCard(product: product).reveal()
+                    LabelCard(product: product)
                 }
                 if let ingredients = product.ingredients {
-                    IngredientsCard(text: ingredients).reveal()
+                    IngredientsCard(text: ingredients)
                 }
                 if !product.additives.isEmpty {
-                    AdditivesCard(codes: product.additives).reveal()
+                    AdditivesCard(codes: product.additives)
                 }
                 if let allergens = product.allergens {
-                    AllergensCard(raw: allergens).reveal()
+                    AllergensCard(raw: allergens)
                 }
                 AlternativesCard(product: product, prefs: DietaryPreference.decode(dietaryRaw))
-                CommunityCard(product: $product).reveal()
-                compareCard.reveal()
+                CommunityCard(product: $product)
+                compareCard
                 footer
             }
             .padding(.horizontal, TL.gutter)
@@ -63,6 +63,7 @@ struct ProductScreen: View {
         }
         .background(alignment: .top) { imageBleed }
         .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
         .screenBackground()
         .navigationTitle(inSheet ? "" : product.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -237,7 +238,7 @@ struct ComparePickerSheet: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button("Compare \(selected.count + 1) products") {
-                    guard let me = records.first(where: { $0.barcode == current.barcode }) else { return }
+                    let me = records.first { $0.barcode == current.barcode } ?? ScanRecord(product: current)
                     comparing = [me] + others.filter { selected.contains($0.barcode) }
                 }
                 .buttonStyle(.primary)

@@ -41,7 +41,6 @@ struct RootView: View {
             Tab("Verify", systemImage: "checkmark.seal.fill", value: AppRouter.Tab.verify) { VerifyView() }
             Tab("You", systemImage: "person.fill", value: AppRouter.Tab.you) { ProfileView() }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory {
             ScanAccessory()
         }

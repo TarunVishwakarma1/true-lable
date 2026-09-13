@@ -112,12 +112,17 @@ struct SearchScreen: View {
     }
 
     private func search() async {
-        guard trimmed.count >= 2 else { results = []; return }
+        guard trimmed.count >= 2 else {
+            results = []
+            searching = false
+            return
+        }
         // Debounce: typing cancels the previous task before it fires.
         try? await Task.sleep(for: .milliseconds(320))
         guard !Task.isCancelled else { return }
         searching = true
         failed = false
+        defer { searching = false }
         do {
             let found = try await API.search(trimmed)
             guard !Task.isCancelled else { return }
@@ -125,7 +130,6 @@ struct SearchScreen: View {
         } catch {
             if !Task.isCancelled { failed = true }
         }
-        searching = false
     }
 
     private func remember(_ term: String) {

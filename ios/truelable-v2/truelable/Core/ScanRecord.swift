@@ -11,7 +11,6 @@ import Foundation
 import SwiftData
 
 @Model
-@MainActor
 final class ScanRecord {
     @Attribute(.unique) var barcode: String
     var name: String
@@ -28,6 +27,7 @@ final class ScanRecord {
     var verified: Bool
     var snapshot: Data
 
+    @MainActor
     init(product: Product, at date: Date = .now) {
         barcode = product.barcode
         name = product.name
@@ -45,10 +45,12 @@ final class ScanRecord {
         snapshot = (try? JSONEncoder().encode(product)) ?? Data()
     }
 
+    @MainActor
     var product: Product? {
         try? JSONDecoder().decode(Product.self, from: snapshot)
     }
 
+    @MainActor
     func refresh(with product: Product, bump: Bool) {
         name = product.name
         brand = product.brand ?? ""
@@ -69,6 +71,7 @@ final class ScanRecord {
 
     /// Insert-or-update by barcode. `bump` moves it to the top of history
     /// (a real new look-up); `false` just refreshes the snapshot.
+    @MainActor
     static func record(_ product: Product, in context: ModelContext, bump: Bool = true) {
         let barcode = product.barcode
         let existing = try? context.fetch(FetchDescriptor<ScanRecord>(predicate: #Predicate { $0.barcode == barcode })).first

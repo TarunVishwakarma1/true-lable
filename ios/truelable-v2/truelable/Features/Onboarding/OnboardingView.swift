@@ -131,6 +131,7 @@ struct OnboardingView: View {
             .padding(.horizontal, 28)
         }
         .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
     }
 }
 
