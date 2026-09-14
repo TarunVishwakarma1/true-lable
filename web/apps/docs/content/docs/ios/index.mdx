@@ -26,7 +26,8 @@ truelable/
 │   ├── Product.swift                  Product/Nutrition models, tolerant decoding
 │   ├── ScanRecord.swift                @Model — the one SwiftData persistence type
 │   ├── NutritionParser.swift            OCR text → Nutrition
-│   └── BarcodeChecksum.swift             EAN/UPC mod-10 validation
+│   ├── BarcodeChecksum.swift             EAN/UPC mod-10 validation
+│   └── CrashReporter.swift                MetricKit subscriber — see below
 ├── Design/
 │   ├── Theme.swift             enum TL — every design token (see below)
 │   └── Components.swift         Buttons, ScoreRing, GradeStrip, BarMeter, StatTile, ProductCardRow, ...
@@ -43,7 +44,8 @@ truelable/
 │   ├── Contribute/                Live-capture OCR wizard
 │   └── Search/                      Debounced search sheet
 ├── TrueLabel.storekit    Local StoreKit config for testing Plus (monthly/yearly)
-└── truelable.entitlements
+├── truelable.entitlements
+└── PrivacyInfo.xcprivacy   Required Reason API declarations (UserDefaults — CA92.1)
 ```
 
 ## Navigation — `AppRouter`
@@ -141,3 +143,38 @@ is serif (New York) — the one typographic signature; body/UI stay SF.
 `.glassEffect()` with a `reduceTransparency` accessibility fallback to a
 flat fill. `.screenBackground()` is a flat fill plus a **static**
 `MeshGradient` — explicitly not animated, so it costs nothing at runtime.
+
+## Crash reporting
+
+`Core/CrashReporter.swift`, installed from `TrueLabelApp.init()`.
+
+<Callout type="info" title="MetricKit, not a hand-rolled signal handler">
+  A POSIX signal handler has to be async-signal-safe — no malloc, no ARC,
+  most of the Swift runtime off limits — to avoid crashing *harder* while
+  reporting a crash. That's a narrow, easy-to-get-wrong problem real crash
+  reporters spend thousands of lines getting right. `MetricKit` is Apple's
+  own safe capture mechanism (iOS 13+, no third-party dependency): it hands
+  `CrashReporter` an already-symbolicated `MXCrashDiagnostic` on a *later*
+  launch, typically within about a day — the same cadence as Xcode
+  Organizer's own crash reports. Instant delivery isn't possible this way;
+  reliable, safe delivery is the trade.
+</Callout>
+
+```swift
+final class CrashReporter: NSObject, MXMetricManagerSubscriber {
+    static let shared = CrashReporter()   // MetricKit holds only a weak
+                                           // reference to subscribers —
+                                           // this is what keeps it alive
+    func start() { MXMetricManager.shared.add(self) }
+    func didReceive(_ payloads: [MXDiagnosticPayload]) { … }
+}
+```
+
+Each `MXCrashDiagnostic` becomes one `POST /api/v1/crash-reports` — title
+from `exceptionType` or `signal`, `stack_trace` from
+`callStackTree.jsonRepresentation()`, `app_version`/`os_version`/
+`device_model` from `metaData`, and `device_id` from
+`UIDevice.identifierForVendor` (a loose correlation id, not the same
+identity as the backend's own device tokens). Best-effort — a failed
+upload is swallowed, never surfaced to the person holding the phone. See
+[Dashboard](/docs/dashboard) for where these end up.

@@ -1,13 +1,14 @@
 ---
 title: Web Workspace
-description: Turborepo (bun) — the marketing site, this docs site, and the shared design system.
+description: Turborepo (bun) — the marketing site, this docs site, the dashboard, and the shared design system.
 ---
 
 ```
 web/
 ├── apps/
-│   ├── web/     Marketing/landing site (Next.js) — localhost:3000
-│   └── docs/     This docs site (Next.js + Fumadocs) — localhost:3001
+│   ├── web/           Marketing/landing site (Next.js) — localhost:3000
+│   ├── docs/            This docs site (Next.js + Fumadocs) — localhost:3001
+│   └── dashboard/          Internal staff tool — localhost:3002, see /docs/dashboard
 ├── packages/
 │   ├── ui/        Shared design tokens + components — @repo/ui
 │   ├── eslint-config/
@@ -25,6 +26,7 @@ bun install
 bun run dev              # every app, in parallel
 bun run dev --filter=web    # just the marketing site
 bun run dev --filter=docs    # just this docs site
+bun run dev --filter=dashboard # just the dashboard
 bun run build
 bun run lint
 bun run check-types
@@ -32,9 +34,13 @@ bun run check-types
 
 ## `@repo/ui`
 
-The design-token package both `apps/web` and `apps/docs` build on —
-exported as `"./*": "./src/*.tsx"` plus `"./styles.css"`, so any file under
-`packages/ui/src` is importable as `@repo/ui/<name>`.
+The design-token package all three apps build on — exported as
+`"./*": "./src/*.tsx"` plus `"./styles.css"`, so any file under
+`packages/ui/src` is importable as `@repo/ui/<name>`. Not every app uses
+every component: the dashboard reuses `theme-toggle`/`providers` and the
+brand tokens, but deliberately skips the marketing-flavored ones
+(`cursor`, `preloader`, `smooth-scroll`) — those read as gimmicks on an
+internal admin tool, not polish.
 
 Design tokens (`styles.css`) — warm-paper light mode, near-black dark mode,
 emerald accent, one signature easing curve:
@@ -69,4 +75,7 @@ elements (`@react-three/fiber`, `@react-three/drei`,
 Follow `apps/web`/`apps/docs`'s existing shape exactly — same script names
 (`dev`/`build`/`start`/`lint`/`check-types`), same `@repo/eslint-config` /
 `@repo/typescript-config` references — so it slots into `turbo.json`'s
-existing task graph with no changes needed there.
+existing task graph with no changes needed there. `apps/dashboard` is a
+real example of exactly that: same shape, plus its own `prisma/` for
+typed local queries against the backend's database (never its own
+migration authority — see [Dashboard](/docs/dashboard)).

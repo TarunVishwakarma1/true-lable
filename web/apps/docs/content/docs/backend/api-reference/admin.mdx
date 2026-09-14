@@ -1,0 +1,97 @@
+---
+title: Admin & Crash Reports
+description: The dashboard's API surface — a separate auth system from the rest of this reference.
+---
+
+Everything on this page is for `web/apps/dashboard`, not the iOS app. Auth
+is bearer tokens for named `dashboard_users`, not devices — see
+[Authentication → Dashboard staff accounts](/docs/backend/authentication#dashboard-staff-accounts)
+for `register`/`login`/`me`/`logout`, which aren't repeated here.
+
+## Submitting a crash report
+
+`POST /api/v1/crash-reports` — **unauthenticated**, 200/hr per address
+
+The one endpoint on this page a device calls, not a staff member — a crash
+can happen before a device has finished registering, so filing one can
+never depend on a token. This is what iOS's `CrashReporter` posts to (see
+[iOS: crash reporting](/docs/ios#crash-reporting)), and it's also reachable
+directly for anything with no automated path.
+
+```json
+{
+  "platform": "ios",
+  "title": "Signal 6",
+  "description": "optional",
+  "stack_trace": "optional, up to 20,000 characters",
+  "app_version": "optional",
+  "os_version": "optional",
+  "device_model": "optional",
+  "severity": "critical",
+  "device_id": "optional — a loose correlation id, not an auth credential"
+}
+```
+
+`platform` is one of `ios` / `backend` / `web`. `severity` defaults to
+`medium` if omitted; one of `low` / `medium` / `high` / `critical`.
+
+## Managing reports
+
+```
+GET   /api/v1/admin/crash-reports                — list, any signed-in staff account
+POST  /api/v1/admin/crash-reports                 — file one by hand, any signed-in staff account
+GET   /api/v1/admin/crash-reports/{id}
+PATCH /api/v1/admin/crash-reports/{id}             { status?, severity? }
+POST  /api/v1/admin/crash-reports/{id}/github-issue — admin role only
+```
+
+`GET` (list) takes `status`, `platform`, `severity`, `q` (matched against
+title and description, case-insensitive), `limit` (default 50, max 200),
+and `offset` — all optional, combined with `AND`.
+
+`status` is a JIRA/Bugzilla-shaped funnel, not the coarser set an earlier
+version of this table used:
+
+```
+submitted → pending → in_review → in_progress → done
+                                                → wont_fix
+```
+
+<Callout type="info" title="resolved_at only means done">
+  Moving a report to `done` stamps `resolved_at`; moving it to anything
+  else (including `wont_fix`) clears it. `wont_fix` is a closed state, not
+  a fixed one — the two aren't the same claim.
+</Callout>
+
+`POST .../github-issue` is the one action gated to the `admin` role
+specifically rather than any signed-in staff account — it reaches a third
+party and leaves a permanent public trace, unlike triaging a status. It
+formats the report into a real issue body (description, a platform/
+severity/version table, a collapsible stack trace) and writes the
+resulting `github_issue_number` / `github_issue_url` back onto the row. A
+report that already has one refuses with `409 Conflict` rather than
+opening a duplicate. Needs `GITHUB_TOKEN` (a PAT with `Issues: write` on
+`GITHUB_REPO`) configured on the backend — unset, this one endpoint fails
+with a clear error and everything else keeps working.
+
+`POST` (file by hand) takes the same body as the public submit endpoint
+above, but sets `source: "manual"` and `reported_by` to the caller instead
+of `source: "app"` — the distinction that lets the dashboard tell "the app
+reported this itself" from "a person typed this in."
+
+## Team
+
+```
+GET   /api/v1/admin/team              — any signed-in staff account
+PATCH /api/v1/admin/team/{id}/role     { role: "admin" | "member" }  — admin role only
+```
+
+```json
+[
+  { "id": "…", "name": "Tarun", "email": "…", "occupation": "SDE", "role": "admin", "created_at": "…" }
+]
+```
+
+Changing a role refuses with `409 Conflict` if it would demote the last
+remaining admin — otherwise the team could lock itself out with no way
+back short of a direct database edit.

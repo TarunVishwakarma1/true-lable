@@ -3,7 +3,7 @@ title: Getting Started
 description: Run the backend, iOS app, and web apps locally.
 ---
 
-The three apps are independent — you don't need all of them running to work
+The four apps are independent — you don't need all of them running to work
 on one. Pick the tab(s) you need.
 
 <Tabs items={['Backend', 'iOS', 'Web']}>
@@ -99,9 +99,17 @@ bun run dev
 ```
 
 This starts every app in the Turborepo in parallel — the marketing site at
-`localhost:3000` (`apps/web`) and this docs site at `localhost:3001`
-(`apps/docs`). Run one app on its own with `bun run dev --filter=web` or
-`--filter=docs`.
+`localhost:3000` (`apps/web`), this docs site at `localhost:3001`
+(`apps/docs`), and the [dashboard](/docs/dashboard) at `localhost:3002`
+(`apps/dashboard`). Run one app on its own with `bun run dev --filter=web`,
+`--filter=docs`, or `--filter=dashboard`.
+
+<Callout type="warn" title="The dashboard needs its own .env">
+  `cp apps/dashboard/.env.example apps/dashboard/.env` first —
+  `DATABASE_URL` points Prisma at the same Postgres the backend uses, for
+  typed queries only. `backend/migrations/` stays the one migration
+  authority; never run `prisma migrate` against it.
+</Callout>
 
 </Tab>
 </Tabs>
@@ -112,7 +120,8 @@ This starts every app in the Turborepo in parallel — the marketing site at
 true-lable/
 ├── backend/     Rust (Axum) API — see /docs/backend
 ├── ios/         SwiftUI app — see /docs/ios
-├── web/         Turborepo (bun) — apps/web, apps/docs, packages/ui — see /docs/web
+├── web/         Turborepo (bun) — apps/web, apps/docs, apps/dashboard, packages/ui
+│                see /docs/web and /docs/dashboard
 ├── deploy/      The real production deployment (nginx + systemd on a droplet)
 ├── k8s/, infra/ Kubernetes/Terraform scaffolding — not the current deployment method, see /docs/deployment
 └── docker-compose.yml   Postgres + Redis for local backend dev

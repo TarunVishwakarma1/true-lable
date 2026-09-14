@@ -1,4 +1,4 @@
 {
   "title": "TrueLabel Docs",
-  "pages": ["index", "getting-started", "architecture", "backend", "ios", "web", "deployment", "contributing"]
+  "pages": ["index", "getting-started", "architecture", "backend", "ios", "web", "dashboard", "deployment", "contributing"]
 }

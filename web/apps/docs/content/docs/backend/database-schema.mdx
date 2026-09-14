@@ -1,6 +1,6 @@
 ---
 title: Database Schema
-description: The current schema, from all 16 migrations.
+description: The current schema, from all 17 migrations.
 ---
 
 Migrations run automatically at boot (`db::run_migrations`), from
@@ -116,6 +116,59 @@ device_id            VARCHAR(128)
 created_at / updated_at   TIMESTAMPTZ
 ```
 
+## `dashboard_users`
+
+One row per **named staff account** — a deliberately separate identity
+system from `users` above; a bug in one authority can never leak into the
+other. Backs `web/apps/dashboard`. See
+[Authentication → Dashboard staff accounts](/docs/backend/authentication#dashboard-staff-accounts).
+
+```sql
+id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
+name              VARCHAR(120) NOT NULL
+email             VARCHAR(255) NOT NULL   -- UNIQUE on LOWER(email)
+date_of_birth     DATE
+occupation        VARCHAR(120)
+password_hash     TEXT NOT NULL           -- Argon2, not the sha2 used for device tokens
+role              VARCHAR(20) NOT NULL DEFAULT 'member'   -- 'admin' | 'member'
+token_hash        CHAR(64)                -- SHA-256 of the bearer token, UNIQUE where not null
+token_issued_at   TIMESTAMPTZ
+created_at        TIMESTAMPTZ
+updated_at        TIMESTAMPTZ
+```
+
+## `crash_reports`
+
+```sql
+id                    UUID PRIMARY KEY DEFAULT gen_random_uuid()
+platform              VARCHAR(20) NOT NULL     -- 'ios' | 'backend' | 'web'
+title                 VARCHAR(255) NOT NULL
+description           TEXT
+stack_trace           TEXT
+app_version           VARCHAR(50)
+os_version            VARCHAR(50)
+device_model          VARCHAR(100)
+severity              VARCHAR(20) NOT NULL DEFAULT 'medium'    -- low | medium | high | critical
+status                VARCHAR(20) NOT NULL DEFAULT 'submitted'
+                      -- submitted | pending | in_review | in_progress | done | wont_fix
+source                VARCHAR(20) NOT NULL DEFAULT 'app'       -- 'app' | 'manual'
+device_id             VARCHAR(255)             -- loose reference, no FK — same convention as verifications.device_id
+reported_by           UUID REFERENCES dashboard_users(id) ON DELETE SET NULL
+github_issue_number   INT
+github_issue_url      TEXT
+metadata              JSONB NOT NULL DEFAULT '{}'
+created_at            TIMESTAMPTZ
+updated_at            TIMESTAMPTZ
+resolved_at           TIMESTAMPTZ              -- set only when status becomes 'done'
+```
+
+`status`'s six-value funnel replaced a coarser four-value one
+(`open`/`investigating`/`resolved`/`wont_fix`) once real triage started —
+see migration `20240101000017`. `reported_by` is null for `source = 'app'`
+reports (nothing to attribute — a device filed it, not a person) and set
+for `source = 'manual'` ones. Full endpoint list:
+[API Reference → Admin](/docs/backend/api-reference/admin).
+
 ## Indexes
 
 ```sql
@@ -144,6 +197,16 @@ CREATE INDEX ON ocr_submissions(device_id) WHERE device_id IS NOT NULL;
 CREATE INDEX ON users(plus_since) WHERE plus_since IS NOT NULL;
 CREATE UNIQUE INDEX ON users(apple_user_id) WHERE apple_user_id IS NOT NULL;
 CREATE UNIQUE INDEX ON users(token_hash) WHERE token_hash IS NOT NULL;
+
+-- dashboard_users
+CREATE UNIQUE INDEX ON dashboard_users(LOWER(email));
+CREATE UNIQUE INDEX ON dashboard_users(token_hash) WHERE token_hash IS NOT NULL;
+
+-- crash_reports
+CREATE INDEX ON crash_reports(status);
+CREATE INDEX ON crash_reports(platform);
+CREATE INDEX ON crash_reports(created_at DESC);
+CREATE INDEX ON crash_reports(device_id) WHERE device_id IS NOT NULL;
 ```
 
 The trigram (`gin_trgm_ops`) indexes need the `pg_trgm` extension, created

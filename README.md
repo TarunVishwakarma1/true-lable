@@ -85,8 +85,14 @@ physical device).
 ```bash
 cd web
 bun install
-bun run dev             # marketing site :3000, docs site :3001, in parallel
+bun run dev             # marketing :3000, docs :3001, dashboard :3002, in parallel
 ```
+
+The dashboard (`apps/dashboard` — crash reports, team, resources) additionally
+needs its own `.env` (`cp apps/dashboard/.env.example apps/dashboard/.env`):
+it reads the same Postgres database as the backend via Prisma for local
+tooling, but **migrations stay owned by `backend/migrations/`** — never run
+`prisma migrate` against it.
 
 ---
 
@@ -96,8 +102,11 @@ Past the MVP stage described in earlier planning docs — the backend has a
 full product-lookup/search/trending/verification API, device-token auth
 with optional Sign in with Apple, Redis-backed rate limiting, and OCR
 submission; the iOS app is a full SwiftUI rewrite (scan, verify, history,
-profile, TrueLabel Plus). See the [docs site](web/apps/docs) for the
-current architecture in depth rather than a sprint-by-sprint history here.
+profile, TrueLabel Plus) that now also reports its own crashes via
+MetricKit; and `web/apps/dashboard` gives staff a place to triage those
+reports, manage who has dashboard access, and publish a report straight to
+a GitHub issue. See the [docs site](web/apps/docs) for the current
+architecture in depth rather than a sprint-by-sprint history here.
 
 ---
 
@@ -284,6 +293,18 @@ Notes that matter when querying:
   it never sits on the scan path. It ranks `/products/trending` and breaks
   ties in search.
 
+Two more tables back the dashboard (`web/apps/dashboard`), a deliberately
+separate identity system from `users` above — a bug in one can never leak
+into the other's authority. `dashboard_users` is one row per staff account
+(name, email, `occupation`, Argon2 `password_hash`, `role` — `admin` or
+`member` — plus the same bearer-token-hash session mechanics as device
+auth). `crash_reports` holds what the dashboard triages: `platform`,
+`title`, `stack_trace`, a JIRA-shaped `status` funnel (`submitted` →
+`pending` → `in_review` → `in_progress` → `done`, or `wont_fix`),
+`source` (`app` — iOS's own `CrashReporter` via MetricKit — or `manual`),
+and `github_issue_url` once published. Full column lists are on the
+[docs site](web/apps/docs/content/docs/backend/database-schema.mdx).
+
 ### Indices
 
 ```sql
@@ -319,7 +340,7 @@ provider ships `pg_trgm` on its allowed list.
 There are no accounts, so a **device** is the subject. It proves itself with
 a bearer token, not with its identifier:
 
-```
+```markdown
 POST /api/v1/auth/device        (no body, no auth)
 → { "device_id": "…", "token": "…" }
 ```
@@ -328,7 +349,7 @@ The token is issued once per install and returned once. Only its SHA-256 is
 stored, so a database leak does not hand over credentials. Every per-user
 endpoint then takes it:
 
-```
+```markdown
 Authorization: Bearer <token>
 ```
 
@@ -345,10 +366,21 @@ app — that is what lets a reinstall keep its profile. A `401` means the row
 behind the token is gone; the client registers afresh and retries once.
 
 | Endpoint | Auth |
-|---|---|
-| `/health*`, `/products/search`, `/query`, `/trending`, `/alternatives` | none |
+| --- | --- |
+| `/health*`, `/products/search`, `/query`, `/trending`, `/alternatives`, `/crash-reports` (submit) | none |
 | `/products/needs-verification` | optional — a token lets it skip what you already voted on |
 | `/products/verify`, `/ocr/submit`, all of `/me/*` | **required** |
+
+**`/admin/*` is a second, separate auth system** — bearer tokens for
+`dashboard_users` (named staff accounts with a password), not devices. It
+backs `web/apps/dashboard`, not the iOS app: `POST /admin/auth/register` /
+`login` mint the same shape of token via the same hash-only-stored
+mechanics as device auth, and the resulting token gates
+`/admin/crash-reports/*` (reading/triaging reports is any signed-in staff
+account; publishing one to GitHub is gated to the `admin` role) and
+`/admin/team/*` (viewing the team is any staff account; changing a role is
+`admin`-only, and the last admin can't demote themselves). Full contract
+on the [docs site](web/apps/docs/content/docs/backend/api-reference).
 
 ### Transport and browser posture
 
@@ -385,7 +417,7 @@ behind one address and limiting everybody by IP would punish a whole carrier
 for one script.
 
 | Bucket | Limit | Subject |
-|---|---|---|
+| --- | --- | --- |
 | Barcode look-up | 600 | device or address |
 | Text search | 200 | device or address |
 | Confirm a label | 60 | device |
@@ -435,8 +467,6 @@ failure worth preventing.
 
 Request bodies are capped at 256 KB, and an OCR submission at 20,000
 characters of recognised text.
-
-
 
 Every response is wrapped in the same envelope:
 
@@ -700,7 +730,7 @@ Every field is optional — absent means "leave it alone", so country can
 change without resending the preference list. The backend does not own the
 preference vocabulary (the app does, and it grows), so entries are stored as
 given, but trimmed, de-duplicated, and capped at 32 entries of 64 characters
-so one client cannot write an unbounded blob into a shared table. 
+so one client cannot write an unbounded blob into a shared table.
 
 ---
 
@@ -851,7 +881,7 @@ true-lable/
 │   └── src/
 │       ├── main.rs                 # Entrypoint & graceful shutdown
 │       ├── lib.rs                  # App assembler
-│       ├── auth.rs                 # Device-token issuing & verification
+│       ├── auth.rs                 # Device tokens (Device) & dashboard sessions (AdminUser)
 │       ├── config/env.rs           # Typed config, credential masking
 │       ├── db/{postgres,redis}.rs
 │       ├── error.rs                # AppError → HTTP status mapping
@@ -859,26 +889,31 @@ true-lable/
 │       ├── middleware/             # logging, error_handler
 │       ├── routes/
 │       │   ├── health.rs
-│       │   └── v1/{products,ocr,me}.rs
-│       ├── handlers/{products,ocr,users}.rs
+│       │   └── v1/{products,ocr,me,admin,crash_reports}.rs
+│       ├── handlers/{products,ocr,users,admin_auth,crash_reports}.rs
 │       ├── services/
 │       │   ├── product_service.rs
 │       │   ├── ocr_service.rs      # ingredient_overlap_ratio confidence check
 │       │   ├── openfoodfacts.rs
 │       │   ├── cache_service.rs
 │       │   ├── user_service.rs
-│       │   └── apple_auth.rs       # Sign in with Apple JWT verification
-│       └── models/{product,ocr,user,verification,response}.rs
+│       │   ├── apple_auth.rs       # Sign in with Apple JWT verification
+│       │   ├── admin_service.rs    # Dashboard staff accounts, team, roles
+│       │   ├── crash_report_service.rs
+│       │   └── github_service.rs   # "Publish to GitHub" issue creation
+│       └── models/{product,ocr,user,verification,response,admin,crash_report}.rs
 ├── ios/truelable/truelable/        # iOS app (SwiftUI, iOS 26+)
 │   ├── App/                        # TrueLabelApp, RootView, AppRouter
-│   ├── Core/                       # APIClient, DeviceAuth, Account, Preferences, Plus
+│   ├── Core/                       # APIClient, DeviceAuth, Account, Preferences, Plus, CrashReporter
 │   ├── Design/                     # Theme.swift (enum TL), Components.swift
-│   └── Features/
-│       ├── Home/ Onboarding/ Scan/ Product/ History/
-│       └── Verify/ Profile/ Account/ Plus/ Contribute/ Search/
+│   ├── Features/
+│   │   ├── Home/ Onboarding/ Scan/ Product/ History/
+│   │   └── Verify/ Profile/ Account/ Plus/ Contribute/ Search/
+│   └── PrivacyInfo.xcprivacy       # Required Reason API declarations (UserDefaults)
 ├── web/                             # Turborepo (bun workspaces)
 │   ├── apps/web/                   # Marketing site (Next.js)
-│   ├── apps/docs/                  # Developer docs (Fumadocs) — you are here
+│   ├── apps/docs/                  # Developer docs (Fumadocs)
+│   ├── apps/dashboard/             # Internal admin dashboard — crash reports, team, resources
 │   └── packages/{ui,eslint-config,typescript-config}/
 ├── deploy/                          # Real production deployment (droplet)
 │   ├── nginx-api.truelabel.fun.conf
@@ -962,11 +997,22 @@ forwards, not a spoofable header).
 
 ## 📊 Monitoring & Analytics
 
-Nothing here is wired up yet — this is the plan, not current state:
+**Crash reporting is live**, self-built rather than a third-party SDK: iOS
+crashes go through `MetricKit` — Apple's own safe capture mechanism, not a
+hand-rolled signal handler — which hands `CrashReporter.swift` an
+already-symbolicated diagnostic on a later launch (typically within a day,
+the same cadence as Xcode Organizer's own crash reports). It POSTs to the
+unauthenticated `POST /api/v1/crash-reports`, and staff triage the result
+in `web/apps/dashboard` (status funnel, filters, search, and a one-click
+"publish as GitHub issue" for anything that needs a real ticket). Staff can
+also file a report by hand from the dashboard for anything with no
+automated path yet — a TestFlight crash log, a user email.
+
+Everything else here is still the plan, not current state:
 
 - **Performance**: P95 API latency, Redis cache hit ratio, Open Food Facts failure rate.
 - **Data quality**: verification-count distribution, `ingredient_overlap_ratio` distribution, flag rate.
-- **Planned tools**: Sentry (errors), PostHog (product analytics), Prometheus + Grafana (container metrics). None are currently integrated in `backend/` or the iOS app — the only present signal today is structured request logging (`middleware/logging.rs`) and the `/health`, `/health/live`, `/health/ready` endpoints.
+- **Planned tools**: Sentry (errors beyond crashes), PostHog (product analytics), Prometheus + Grafana (container metrics). None are integrated yet — the only other present signal is structured request logging (`middleware/logging.rs`) and the `/health`, `/health/live`, `/health/ready` endpoints.
 
 ---
 

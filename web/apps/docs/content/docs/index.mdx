@@ -8,30 +8,35 @@ community-verified nutrition database. Scan a packaged product, see real
 nutrition facts, and help verify or add labels the catalogue doesn't have
 yet.
 
-This site documents the three things that make up the product, all in one
+This site documents the four things that make up the product, all in one
 monorepo:
 
 <Cards>
   <Card title="Backend" href="/docs/backend">
     Rust (Axum) API — product lookup, device auth, rate limiting, OCR
-    submission, profile/subscription.
+    submission, profile/subscription, crash reports.
   </Card>
   <Card title="iOS app" href="/docs/ios">
     SwiftUI, iOS 26.5+. Scan, verify, history, and profile — talks to the
     backend over a typed `APIClient`.
   </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Internal staff tool — triage crash reports, manage who has access,
+    publish a report straight to a GitHub issue.
+  </Card>
   <Card title="Web" href="/docs/web">
-    Turborepo (bun) — the marketing site and this docs site, sharing a
-    `@repo/ui` design-token package.
+    Turborepo (bun) — the marketing site, this docs site, and the
+    dashboard, sharing a `@repo/ui` design-token package.
   </Card>
 </Cards>
 
 ## Where to start
 
-- New to the repo? [Getting Started](/docs/getting-started) gets all three
+- New to the repo? [Getting Started](/docs/getting-started) gets all four
   apps running locally.
 - Want the shape of the whole system first? [Architecture](/docs/architecture).
 - Building a client against the API? [API Reference](/docs/backend/api-reference/products).
+- Triaging crash reports or managing staff access? [Dashboard](/docs/dashboard).
 - Opening a PR? [Contributing](/docs/contributing).
 
 <Callout title="Accuracy over completeness">

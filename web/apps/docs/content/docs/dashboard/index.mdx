@@ -1,0 +1,81 @@
+---
+title: Dashboard
+description: The internal staff tool at web/apps/dashboard — crash reports, team, resources.
+---
+
+Lives at `web/apps/dashboard`, port `3002` locally. Next.js, no relation to
+the marketing site's design beyond sharing `@repo/ui`'s brand tokens — this
+is an internal tool, not a public-facing page, and `robots.ts` says so.
+
+<Callout type="info" title="A second, separate identity system">
+  Signing in here has nothing to do with the iOS app's device tokens. A
+  dashboard account is a named person with a real password
+  (`dashboard_users`, Argon2-hashed) — see
+  [Authentication](/docs/backend/authentication#dashboard-staff-accounts)
+  for how the two systems stay apart.
+</Callout>
+
+## Pages
+
+- **Overview** (`/dashboard`) — a 14-day report trend and a status
+  breakdown, built with `recharts`.
+- **Crash Reports** (`/dashboard/crash-reports`) — search, filter by
+  platform/severity/status, and a per-status count strip that doubles as a
+  filter (click a tile to filter by it). Each report's detail page has an
+  inline-editable status/severity panel and, for admins, a "Publish to
+  GitHub" button.
+- **Team** (`/dashboard/team`) — every account with dashboard access.
+  Admins can change a role inline; the last admin can't demote themselves,
+  so the team can't lock itself out.
+- **Resources** (`/dashboard/resources`) — static links grouped by
+  audience (newcomer, contributor, staff), out to this docs site and the
+  GitHub repo. Nothing here needs the backend.
+
+## Roles
+
+Two: `admin` and `member`. The **first account ever registered becomes
+`admin` automatically** — that's what makes "I'll be the admin" true
+without a manual database edit. Every account after that starts as
+`member`.
+
+Reading and triaging is the same for both roles — any signed-in account
+can view crash reports, the team list, and change a report's status or
+severity. Two actions are `admin`-only, because they're the ones with
+real external consequences: **publishing a report to GitHub** (reaches a
+third party, leaves a permanent public trace) and **changing someone's
+role**.
+
+## Where crash reports come from
+
+Two paths into the same `crash_reports` table, distinguished by `source`:
+
+- **`app`** — the iOS app's own `CrashReporter` (MetricKit) posts to the
+  unauthenticated `POST /api/v1/crash-reports` on a later launch after a
+  real crash. See [iOS Architecture](/docs/ios#crash-reporting).
+  `reported_by` is null.
+- **`manual`** — a staff member uses the dashboard's "New report" form for
+  anything with no automated path yet (a TestFlight crash log, a user
+  email). `reported_by` is set to whoever filed it.
+
+## Local dev
+
+```bash
+cd web/apps/dashboard
+cp .env.example .env
+bun install
+bun run dev   # :3002
+```
+
+`DATABASE_URL` in that `.env` points Prisma at the **same** Postgres
+database the Rust backend uses — for typed local queries only.
+`backend/migrations/` stays the one migration authority; never run
+`prisma migrate` against it. `NEXT_PUBLIC_API_URL` is where the browser
+sends requests (defaults to `http://localhost:8080`), and
+`NEXT_PUBLIC_DOCS_URL` is what the Resources page links out to.
+
+<Callout type="warn" title="GitHub publishing needs its own config">
+  The "Publish to GitHub" button calls the backend's
+  `POST /admin/crash-reports/{id}/github-issue`, which needs `GITHUB_TOKEN`
+  and `GITHUB_REPO` set in `backend/.env` — unset, that one endpoint fails
+  with a clear error and everything else keeps working.
+</Callout>

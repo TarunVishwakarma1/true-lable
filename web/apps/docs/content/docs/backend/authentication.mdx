@@ -79,3 +79,37 @@ unverify products other people rely on.
   person chooses via `PUT /me/profile`. The backend is live either way —
   flipping the capability on is a client-only change.
 </Callout>
+
+## Dashboard staff accounts
+
+`/api/v1/admin/*` is a **second, unrelated identity system** — see
+`auth.rs`'s `AdminUser` extractor versus `Device` above. Where a device is
+anonymous and proven by a bearer token alone, a dashboard account
+(`dashboard_users`) is a named person with an email and a real password,
+Argon2-hashed (not the SHA-256 used for device tokens — a password is
+worth phishing, a 244-bit random device token is not).
+
+```
+POST /api/v1/admin/auth/register   {name, email, password, date_of_birth?, occupation?}
+POST /api/v1/admin/auth/login      {email, password}
+GET  /api/v1/admin/auth/me
+POST /api/v1/admin/auth/logout
+```
+
+Once past that, the *mechanics* are the same as device auth on purpose:
+`register`/`login` mint a token, only its hash is stored
+(`dashboard_users.token_hash`), and every `/admin/*` endpoint after that
+takes it as `Authorization: Bearer <token>`. Logging in mints a **new**
+token and overwrites the stored one — a second login (a different browser)
+signs the first one out. One active session per account, the simple
+choice for a handful of staff.
+
+<Callout type="info" title="The first account is the admin">
+  Registration checks `SELECT COUNT(*) FROM dashboard_users` first — zero
+  rows means this is the first account and it gets `role = 'admin'`
+  automatically; every account after that starts as `member`. That is what
+  makes "I'll be the admin" true without a manual database edit.
+</Callout>
+
+Full endpoint list — crash reports, team management — is in
+[API Reference → Admin](/docs/backend/api-reference/admin).
