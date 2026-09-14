@@ -23,27 +23,51 @@ is an internal tool, not a public-facing page, and `robots.ts` says so.
   platform/severity/status, and a per-status count strip that doubles as a
   filter (click a tile to filter by it). Each report's detail page has an
   inline-editable status/severity panel and, for admins, a "Publish to
-  GitHub" button.
+  GitHub" button — once published, status stays in sync with the linked
+  issue in both directions, see
+  [Admin & Crash Reports → GitHub status sync](/docs/backend/api-reference/admin#github-status-sync).
+- **Products** (`/dashboard/products`) — browse/search the product
+  catalogue and edit the curated field set (name, brand, category,
+  ingredients, allergens, nutrition facts, additives, and a few
+  classification flags). Verifying a product is a separate admin-only
+  action from editing its data. See
+  [Admin & Crash Reports → Products](/docs/backend/api-reference/admin#products).
+- **Users** (`/dashboard/users`) — read-only: search app users (device
+  rows, not dashboard staff) by device id, email, or name, filter by
+  active Plus status, and see contribution stats per user. No edit
+  actions — this closes a visibility gap, not an editing one.
 - **Team** (`/dashboard/team`) — every account with dashboard access.
-  Admins can change a role inline; the last admin can't demote themselves,
-  so the team can't lock itself out.
+  Admins can change a role, reset a locked-out teammate's password,
+  invite a new teammate, grant a `member` product-edit rights, or remove
+  an account — the last admin can't demote or remove themselves, so the
+  team can't lock itself out.
+- **Activity** (`/dashboard/activity`, admin-only) — an audit log of who
+  changed what: role changes, password resets, invites, removals, crash
+  report status changes (including ones synced in from GitHub), and
+  product edits/verifications.
 - **Resources** (`/dashboard/resources`) — static links grouped by
   audience (newcomer, contributor, staff), out to this docs site and the
   GitHub repo. Nothing here needs the backend.
 
 ## Roles
 
-Two: `admin` and `member`. The **first account ever registered becomes
-`admin` automatically** — that's what makes "I'll be the admin" true
-without a manual database edit. Every account after that starts as
-`member`.
+Two: `admin` and `member`, plus one standalone permission flag. The
+**first account ever registered becomes `admin` automatically** — that's
+what makes "I'll be the admin" true without a manual database edit. Every
+account after that starts as `member`.
 
-Reading and triaging is the same for both roles — any signed-in account
-can view crash reports, the team list, and change a report's status or
-severity. Two actions are `admin`-only, because they're the ones with
-real external consequences: **publishing a report to GitHub** (reaches a
-third party, leaves a permanent public trace) and **changing someone's
-role**.
+Reading and triaging is the open default — any signed-in account can view
+crash reports, products, users, and the team list, and change a report's
+status or severity. `admin`-only actions are the ones with real external
+consequences or that touch another account's authority: **publishing a
+report to GitHub**, **changing someone's role**, **resetting a password**,
+**removing a teammate**, and **verifying a product**.
+
+**Editing product data is the one exception to "role decides everything"** —
+an admin can grant a specific `member` the `can_edit_products` flag (Team
+page, per-row checkbox) without handing them the admin role itself. That
+flag never extends to verifying a product, which stays admin-only
+regardless.
 
 ## Where crash reports come from
 
@@ -73,9 +97,13 @@ database the Rust backend uses — for typed local queries only.
 sends requests (defaults to `http://localhost:8080`), and
 `NEXT_PUBLIC_DOCS_URL` is what the Resources page links out to.
 
-<Callout type="warn" title="GitHub publishing needs its own config">
+<Callout type="warn" title="GitHub publishing and sync need their own config">
   The "Publish to GitHub" button calls the backend's
   `POST /admin/crash-reports/{id}/github-issue`, which needs `GITHUB_TOKEN`
-  and `GITHUB_REPO` set in `backend/.env` — unset, that one endpoint fails
-  with a clear error and everything else keeps working.
+  and `GITHUB_REPO` set in `backend/.env`. Syncing a status change back in
+  from GitHub needs a webhook registered on the repo plus
+  `GITHUB_WEBHOOK_SECRET` set. Any of these left unset just means that one
+  piece fails with a clear error — everything else keeps working. See
+  [Admin & Crash Reports → GitHub status sync](/docs/backend/api-reference/admin#github-status-sync)
+  for the webhook setup.
 </Callout>
