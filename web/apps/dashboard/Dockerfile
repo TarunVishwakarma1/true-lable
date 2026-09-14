@@ -19,9 +19,16 @@ RUN turbo prune dashboard --docker
 FROM base AS installer
 WORKDIR /app
 COPY --from=pruner /app/out/json/ .
-# `bun install`'s postinstall runs `prisma generate`, which only reads the
-# schema's env("DATABASE_URL") reference — it never connects — but still
-# errors if the var is unset. The real URL is injected at runtime instead.
+# `bun install`'s postinstall runs `prisma generate`, which needs the schema
+# FILE present (not just DATABASE_URL) — but out/json/ is package.json files
+# only, by design, so a build can cache the install layer separately from
+# source. out/full/ (copied wholesale in the builder stage below) has the
+# real schema, but that's too late for this postinstall — so the schema
+# alone comes in early, ahead of the source it's normally bundled with.
+COPY --from=pruner /app/out/full/apps/dashboard/prisma ./apps/dashboard/prisma
+# `prisma generate` only reads the schema's env("DATABASE_URL") reference —
+# it never connects — but still errors if the var is unset. The real URL is
+# injected at runtime instead.
 ENV DATABASE_URL="postgresql://build:build@build:5432/build"
 RUN bun install --frozen-lockfile
 

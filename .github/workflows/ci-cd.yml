@@ -18,6 +18,34 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       sha_tag: ${{ steps.meta.outputs.sha_tag }}
+    # tests/integration_test.rs builds the real app against a real DB/cache
+    # (see its test_config()) — same images/credentials as docker-compose.yml
+    # so this matches local dev exactly. Reachable at localhost because this
+    # job has no top-level `container:` — service ports map straight to the
+    # runner host.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: truelabel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
 
