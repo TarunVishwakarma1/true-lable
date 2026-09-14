@@ -39,6 +39,7 @@ export interface AdminProfile {
   id: string;
   name: string;
   email: string;
+  occupation: string | null;
   role: "admin" | "member";
   created_at: string;
 }
@@ -153,5 +154,11 @@ export const api = {
         method: "POST",
         token,
       }),
+  },
+
+  team: {
+    list: (token: string) => request<AdminProfile[]>("/api/v1/admin/team", { token }),
+    updateRole: (token: string, id: string, role: "admin" | "member") =>
+      request<AdminProfile>(`/api/v1/admin/team/${id}/role`, { method: "PATCH", token, body: { role } }),
   },
 };

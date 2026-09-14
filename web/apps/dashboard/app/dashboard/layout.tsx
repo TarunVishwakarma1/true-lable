@@ -4,13 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Bug, LayoutGrid, LogOut } from "lucide-react";
+import { BookOpen, Bug, LayoutGrid, LogOut, Users } from "lucide-react";
 import { ThemeToggle } from "@repo/ui/theme-toggle";
 import { useAuth } from "../../lib/auth-context";
 
 const LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
   { href: "/dashboard/crash-reports", label: "Crash Reports", icon: Bug },
+  { href: "/dashboard/team", label: "Team", icon: Users },
+  { href: "/dashboard/resources", label: "Resources", icon: BookOpen },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
