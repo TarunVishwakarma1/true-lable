@@ -217,6 +217,44 @@ export interface AdminUpdateProductInput {
   is_palm_oil_free?: boolean;
 }
 
+// Mirrors the backend's `User` struct — one row per device, not per
+// account. Read-only surface in the dashboard: no admin mutation exists.
+export interface AppUser {
+  device_id: string;
+  country: string;
+  dietary_preferences: string[];
+  plus_since: string | null;
+  plus_expires_at: string | null;
+  plus_source: string | null;
+  apple_user_id: string | null;
+  email: string | null;
+  display_name: string | null;
+  linked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserPage {
+  items: AppUser[];
+  total: number;
+}
+
+export interface AdminUserFilters {
+  q?: string;
+  plus_active?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ContributionStats {
+  confirmations: number;
+  contributions: number;
+  helped_verify: number;
+  member_since: string | null;
+}
+
+export type AdminUserDetail = AppUser & { stats: ContributionStats };
+
 function query(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -294,5 +332,12 @@ export const api = {
       request<Product>(`/api/v1/admin/products/${id}`, { method: "PATCH", token, body: patch }),
     verify: (token: string, id: string, verified: boolean) =>
       request<Product>(`/api/v1/admin/products/${id}/verify`, { method: "POST", token, body: { verified } }),
+  },
+
+  users: {
+    list: (token: string, filters: AdminUserFilters = {}) =>
+      request<AdminUserPage>(`/api/v1/admin/users${query({ ...filters })}`, { token }),
+    get: (token: string, deviceId: string) =>
+      request<AdminUserDetail>(`/api/v1/admin/users/${deviceId}`, { token }),
   },
 };

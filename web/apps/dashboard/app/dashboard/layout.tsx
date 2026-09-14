@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Activity, BookOpen, Bug, LayoutGrid, LogOut, Package, Users } from "lucide-react";
+import { Activity, BookOpen, Bug, CircleUser, LayoutGrid, LogOut, Package, Users } from "lucide-react";
 import { ThemeToggle } from "@repo/ui/theme-toggle";
 import { useAuth } from "../../lib/auth-context";
 import { Skeleton } from "../components/skeleton";
@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
   { href: "/dashboard/crash-reports", label: "Crash Reports", icon: Bug },
   { href: "/dashboard/products", label: "Products", icon: Package },
+  { href: "/dashboard/users", label: "Users", icon: CircleUser },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/resources", label: "Resources", icon: BookOpen },
