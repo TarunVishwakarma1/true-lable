@@ -1,0 +1,45 @@
+name: Uptime check
+
+# The one piece of "if something breaks at 3am, does anything notice"
+# this repo had: nothing. This is deliberately not a monitoring stack
+# (Prometheus/Grafana would need cluster resources this project doesn't
+# have budget for) -- a failed scheduled run already sends GitHub's own
+# failure-notification email to the repo owner with zero extra setup or
+# cost, which is the actual requirement, not a dashboard.
+#
+# Upgrade path if this ever stops being enough: a real uptime service
+# (UptimeRobot, Better Uptime, etc.) with SMS/on-call paging, or
+# Prometheus + Alertmanager once there's cluster budget for it.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every public endpoint
+        run: |
+          set -e
+          check() {
+            local name="$1" url="$2"
+            # curl's own %{http_code} already writes "000" on a total
+            # connection failure (DNS, timeout, refused, TLS) -- no ||
+            # fallback needed, and one would double up with it ("000000").
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+            echo "$name ($url) -> $code"
+            if [ "$code" -lt 200 ] || [ "$code" -ge 400 ]; then
+              echo "::error::$name is down or unhealthy (HTTP $code)"
+              return 1
+            fi
+          }
+
+          failed=0
+          check "backend"   "https://api.truelabel.fun/health/ready"       || failed=1
+          check "web"       "https://truelabel.fun"                       || failed=1
+          check "dashboard" "https://dashboard.truelabel.fun/login"        || failed=1
+          check "docs"      "https://docs.truelabel.fun"                  || failed=1
+
+          exit $failed

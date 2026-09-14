@@ -121,18 +121,25 @@ trade for an admin surface. The lookup itself is one indexed row read
   makes "I'll be the admin" true without a manual database edit.
 </Callout>
 
-<Callout type="warn" title="Registration stays open after that first account">
-  `/admin/auth/register` has no invite code or admin-approval gate — only
-  the 10/hr-per-address rate limit in
-  [Rate Limiting](/docs/backend/rate-limiting). That was a reasonable
-  default while the dashboard was only reachable on `localhost`; now that
-  `dashboard.truelabel.fun` is a real public subdomain (see
-  [Deployment](/docs/deployment)), anyone who finds it can create a
-  `member` account and see crash reports and the team roster. Worth a
-  deliberate decision — an invite code, admin-approval queue, or simply
-  disabling `/register` once an admin exists and creating new staff
-  accounts by hand — rather than leaving it on the rate limit alone.
+<Callout type="info" title="Registration closes after that first account">
+  `/admin/auth/register` only stays open (no `Authorization` header
+  required) while `dashboard_users` is empty — the bootstrap case above.
+  Every registration after that requires an authenticated **admin's** token
+  as the caller (`MaybeAdminUser` in `auth.rs`, enforced in
+  `AdminService::register`); a stranger who finds
+  `dashboard.truelabel.fun` gets `401`, not a new account. Adding a
+  teammate is an admin action now, not public sign-up.
 </Callout>
+
+## Password recovery
+
+`PATCH /admin/auth/password` (self, requires the current password) and
+`PATCH /admin/team/{id}/password` (admin-only, no current-password check —
+for a locked-out teammate) cover every case except one: the sole admin
+forgetting their own password, since by definition there's no other admin
+left to call the second endpoint on them. That's a manual recovery, not an
+API — see [Deployment → Recovering a locked-out sole
+admin](/docs/deployment#recovering-a-locked-out-sole-admin).
 
 Full endpoint list — crash reports, team management — is in
 [API Reference → Admin](/docs/backend/api-reference/admin).

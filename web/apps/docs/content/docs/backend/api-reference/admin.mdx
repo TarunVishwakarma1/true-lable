@@ -8,6 +8,18 @@ is bearer tokens for named `dashboard_users`, not devices — see
 [Authentication → Dashboard staff accounts](/docs/backend/authentication#dashboard-staff-accounts)
 for `register`/`login`/`me`/`logout`, which aren't repeated here.
 
+```
+PATCH /api/v1/admin/auth/password  { current_password, new_password } — self, requires the current password
+```
+
+Self-service password change. Requires the current password on purpose —
+the bearer token alone proves "a live session," not "this is really the
+account owner." 20/hr rate limit, same as login attempts, since a wrong
+`current_password` guess is exactly as guessable. See also [Team](#team)
+for resetting a *different* account's password, and [Authentication →
+Password recovery](/docs/backend/authentication#password-recovery) for the
+sole-admin-locked-out case this doesn't cover.
+
 ## Submitting a crash report
 
 `POST /api/v1/crash-reports` — **unauthenticated**, 200/hr per address
@@ -82,8 +94,9 @@ reported this itself" from "a person typed this in."
 ## Team
 
 ```
-GET   /api/v1/admin/team              — any signed-in staff account
-PATCH /api/v1/admin/team/{id}/role     { role: "admin" | "member" }  — admin role only
+GET   /api/v1/admin/team               — any signed-in staff account
+PATCH /api/v1/admin/team/{id}/role      { role: "admin" | "member" }  — admin role only
+PATCH /api/v1/admin/team/{id}/password  { new_password }              — admin role only
 ```
 
 ```json
@@ -95,3 +108,11 @@ PATCH /api/v1/admin/team/{id}/role     { role: "admin" | "member" }  — admin r
 Changing a role refuses with `409 Conflict` if it would demote the last
 remaining admin — otherwise the team could lock itself out with no way
 back short of a direct database edit.
+
+Resetting a password takes no current-password check — the caller's own
+admin session is the authority, same posture as changing a role. For a
+locked-out teammate, not for resetting your own (that's the self-service
+endpoint above, which does check it). Doesn't invalidate the target's
+existing session token; they stay signed in on whatever device they're
+already on, and just need the new password next time they log in
+elsewhere.

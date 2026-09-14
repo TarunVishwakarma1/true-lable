@@ -168,6 +168,116 @@ curl -sI https://docs.truelabel.fun
 kubectl get certificate -n true-label
 ```
 
+## Rolling back a bad deploy
+
+Every image is tagged with the exact commit SHA that built it (`ci-cd.yml`'s
+`deploy` job pins `k8s/overlays/main`'s image tags before applying), so
+`kubectl` already has everything it needs — nothing to rebuild or re-tag by
+hand.
+
+```bash
+# What actually happened — see the last few revisions and which rolled
+# out when. Repeat per deployment: backend, web, dashboard, docs.
+kubectl rollout history deployment/backend -n true-label
+
+# Back out one step. Kubernetes re-applies the previous revision's pod
+# spec (image tag included) and does a normal rolling update — no
+# downtime, same as a forward deploy.
+kubectl rollout undo deployment/backend -n true-label
+
+# Watch it land.
+kubectl rollout status deployment/backend -n true-label
+
+# Need a specific older revision, not just "one back"?
+kubectl rollout undo deployment/backend -n true-label --to-revision=<N>
+```
+
+Roll back only the app that's actually broken — `backend`, `web`,
+`dashboard`, and `docs` deploy and roll back independently, so reverting one
+doesn't touch the others.
+
+<Callout type="warn" title="This doesn't roll back the database">
+  A rollback undoes the *code*; SQL migrations that already ran stay ran —
+  `sqlx` migrations in this app are additive/forward-only by convention, not
+  written with a paired `down` migration. If a bad deploy shipped a
+  migration the old code can't handle, `rollout undo` alone isn't enough;
+  that needs a manual fix, not this command.
+</Callout>
+
+Once you're confident the rollback is right (not just a stopgap), also
+revert or fix-forward the commit in git — `rollout undo` fixes the running
+cluster, not the repo, and the next `git push` to `main` would otherwise
+redeploy the exact thing you just backed out of.
+
+## Recovering a locked-out sole admin
+
+Two API endpoints cover normal password recovery — see [Authentication →
+Password recovery](/docs/backend/authentication#password-recovery) — and
+neither helps if you're the only admin and you're the one locked out: one
+needs your *current* password, the other needs a *different* admin to call
+it on your behalf. Neither exists yet in a fresh deployment, or ever again
+if you're truly the only one.
+
+This is why `backend`'s binary has a `--hash-password` mode — reads a
+password from stdin, prints an Argon2 hash using the exact same code path
+`register`/`reset-password` use, then exits without touching the network or
+starting a server:
+
+```bash
+# Wherever the binary (or its source) is available — your machine is fine,
+# it never needs to reach the database itself.
+echo -n "your-new-password" | ./truelabel-backend --hash-password
+# $argon2id$v=19$m=19456,t=2,p=1$...
+```
+
+Then write that hash straight to Neon (its own SQL console, or `psql
+$DATABASE_URL`):
+
+```sql
+UPDATE dashboard_users
+SET password_hash = '<the $argon2id$... output above>', updated_at = NOW()
+WHERE email = 'you@example.com';
+```
+
+Log in with the new password immediately after — the row's `token_hash`
+isn't touched by this, so any session that was still valid stays valid too.
+
+<Callout type="warn" title="Never write a plaintext password into that column">
+  `password_hash` is exactly that — a hash. Writing plaintext there doesn't
+  fail loudly; it just means nothing can ever log in again until someone
+  runs this same procedure to fix it. The `--hash-password` step above
+  isn't optional.
+</Callout>
+
+## Load testing — what the resource requests/limits are actually based on
+
+`k8s/base/backend/deployment.yaml`'s `requests: 100m/64Mi, limits: 500m/256Mi`
+were reasonable-looking defaults, not measured ones, until this: `wrk -t4
+-c50 -d20s` against `/health/ready` (a real DB + Redis round trip, not a
+static response), backend built `--release`, against local Postgres/Redis —
+
+```
+164,986 requests in 20.01s → 8,245 req/s sustained
+RSS:  ~16 MB   (limit: 256Mi — enormous headroom)
+CPU:  ~160%    (limit: 500m = 50% of one core)
+```
+
+Memory is barely touched — 256Mi is safe to leave as-is, tightening it buys
+nothing. CPU is the real ceiling: 500m would throttle a single pod well
+before 8k req/s. That sounds alarming until the HPA is in the picture —
+`k8s/base/backend/hpa.yaml` targets 70% of the *request* (100m), i.e. ~70m
+CPU per pod, so it scales out to a second/third replica at a small fraction
+of what it took to saturate one pod here. Net: the configured numbers hold
+up, at least for a cheap DB-touching read — not proof against every request
+shape, but no longer a guess either.
+
+The more concrete, actually-actionable number this surfaced: `backend-config`
+sets `MAX_DB_CONNECTIONS=10` per pod. At `minReplicas: 2` that's 20
+connections to Neon; at `maxReplicas: 6` under real scale-out, 60. Confirm
+whatever Neon plan is live has headroom for 60 concurrent connections (or
+sits behind Neon's own pooler) before assuming the HPA can actually reach 6
+replicas without the database itself becoming the limit instead of CPU.
+
 ## The one setting that matters here
 
 <Callout type="warn" title="TRUSTED_PROXY_HOPS=1">
