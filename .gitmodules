@@ -1,0 +1,6 @@
+[submodule "backend"]
+	path = backend
+	url = https://github.com/TarunVishwakarma1/true-label-backend.git
+[submodule "ios/truelable"]
+	path = ios/truelable
+	url = https://github.com/TarunVishwakarma1/true-label-ios.git
