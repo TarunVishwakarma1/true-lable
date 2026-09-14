@@ -104,11 +104,34 @@ token and overwrites the stored one — a second login (a different browser)
 signs the first one out. One active session per account, the simple
 choice for a handful of staff.
 
+A session also expires on its own 30 days after `token_issued_at`, checked
+on every request (`auth.rs`'s `ADMIN_SESSION_TTL_DAYS`) — a token from a
+lost laptop or an abandoned browser tab stops working eventually instead
+of staying valid forever, without needing a stateful blocklist. Deliberately
+**not** JWT: a JWT's whole appeal is skipping the per-request lookup, which
+is irrelevant for a handful of staff rows, and getting that speed back
+would mean giving up instant revocation-by-deleting-the-row — the wrong
+trade for an admin surface. The lookup itself is one indexed row read
+(`idx_dashboard_users_token_hash`), not a scan.
+
 <Callout type="info" title="The first account is the admin">
   Registration checks `SELECT COUNT(*) FROM dashboard_users` first — zero
   rows means this is the first account and it gets `role = 'admin'`
   automatically; every account after that starts as `member`. That is what
   makes "I'll be the admin" true without a manual database edit.
+</Callout>
+
+<Callout type="warn" title="Registration stays open after that first account">
+  `/admin/auth/register` has no invite code or admin-approval gate — only
+  the 10/hr-per-address rate limit in
+  [Rate Limiting](/docs/backend/rate-limiting). That was a reasonable
+  default while the dashboard was only reachable on `localhost`; now that
+  `dashboard.truelabel.fun` is a real public subdomain (see
+  [Deployment](/docs/deployment)), anyone who finds it can create a
+  `member` account and see crash reports and the team roster. Worth a
+  deliberate decision — an invite code, admin-approval queue, or simply
+  disabling `/register` once an admin exists and creating new staff
+  accounts by hand — rather than leaving it on the rate limit alone.
 </Callout>
 
 Full endpoint list — crash reports, team management — is in

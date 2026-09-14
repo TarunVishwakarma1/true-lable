@@ -11,11 +11,16 @@ for one script.
 | Bucket | Limit | Subject |
 |---|---|---|
 | Barcode look-up | 600/hr | device or address |
+| Alternatives | 600/hr | device or address |
+| Trending | 600/hr | device or address |
 | Text search | 200/hr | device or address |
 | Confirm a product | 60/hr | device |
 | Submit a label | 20/hr | device |
 | Profile / subscription / link writes | 60/hr | device |
 | Register a device | 10/hr | address |
+| Dashboard login attempt | 20/hr | address |
+| Dashboard registration | 10/hr | address |
+| Crash report submission | 200/hr | address |
 | **Global backstop, every route** | 3,000/hr | address |
 
 Over the limit returns `429`. The counter is a fixed window, incremented
