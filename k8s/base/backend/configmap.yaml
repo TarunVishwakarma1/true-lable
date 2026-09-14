@@ -26,6 +26,14 @@ data:
   # the only hop.
   TRUSTED_PROXY_HOPS: "1"
 
+  # The backend Service is ClusterIP (see backend/service.yaml) — nothing
+  # outside the cluster can reach this pod's :8080 directly no matter what
+  # interface it binds, so SERVER_HOST=0.0.0.0 here isn't "public exposure"
+  # the way it would be on a bare VM. Tells warn_about_exposure() to trust
+  # that instead of inferring reachability from SERVER_HOST, which would
+  # otherwise false-positive an ERROR log on every boot.
+  TRUST_CONTAINER_NETWORK: "true"
+
   # Browser origins permitted to call the API. The iOS client sends no
   # Origin, so it's unaffected either way. Only the dashboard actually calls
   # this API from a browser — truelabel.fun (marketing) and docs.truelabel.fun
