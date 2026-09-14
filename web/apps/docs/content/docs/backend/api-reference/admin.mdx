@@ -193,3 +193,47 @@ tighter than crash reports' "any signed-in staff," since this surfaces
 password resets and role changes. `actor_name` is a snapshot taken at write
 time, not a live join, so a removed teammate's history still reads
 correctly.
+
+## Products
+
+```
+GET   /api/v1/admin/products              — any signed-in staff account
+GET   /api/v1/admin/products/{id}         — any signed-in staff account
+PATCH /api/v1/admin/products/{id}          — admin role, or can_edit_products
+POST  /api/v1/admin/products/{id}/verify   { verified: boolean } — admin role only
+```
+
+`GET` (list) takes `q` (matched against product name, brand, and barcode,
+case-insensitively), `country`, `verified`, `category`, `limit` (default 50,
+max 200), and `offset`. Returns full product rows — not the lighter card
+shape the public consumer endpoints return — since editing needs full
+detail.
+
+`PATCH` is a curated subset of the product record, not every column: name,
+brand, category, ingredients, allergens, image URL, quantity, nutrition
+facts, additives, NOVA group, Nutri-Score grade, and the three vegan/
+vegetarian/palm-oil-free flags. Not editable here: `barcode` (identity, not
+a correction), `source`, and every field Open Food Facts sync owns or
+derives (`off_synced_at`, `completeness`, `nutriscore_score`,
+`ecoscore_grade`, crowd-verification counters, and a few tag arrays cut for
+now — see the backend's `AdminUpdateProductRequest` for the exact list).
+`allergens` on the wire writes to the structured `allergens_tags` column,
+not the legacy free-text one — the public API prefers the structured column
+whenever it's present, so editing the text column would silently have no
+visible effect for most (Open Food Facts-sourced) products.
+
+<Callout type="warn" title="Cache invalidation">
+  Product reads are cached (see [Rate Limiting](/docs/backend/rate-limiting)
+  for the broader caching picture). Both `PATCH` and `POST .../verify`
+  invalidate the affected product's cache entry before returning, the same
+  two keys the crowd-verification path already busts on a write — otherwise
+  a correction wouldn't be visible to users for up to the cache's TTL.
+</Callout>
+
+`verified` is deliberately not part of the general `PATCH` — it's its own
+admin-only action, on its own route, the same shape as crash-reports'
+`github-issue` being separately gated next to the open-to-any-staff `PATCH`.
+It sits alongside the existing crowd-verification path (three matching
+crowd submissions auto-verifies a product), not replacing it — this is a
+manual, authoritative override an admin can also use to *reverse* a
+mistaken verification, which the crowd path has no way to do.

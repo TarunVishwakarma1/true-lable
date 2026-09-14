@@ -41,6 +41,7 @@ export interface AdminProfile {
   email: string;
   occupation: string | null;
   role: "admin" | "member";
+  can_edit_products: boolean;
   created_at: string;
 }
 
@@ -141,7 +142,82 @@ export interface AuditLogFilters {
   offset?: number;
 }
 
-function query(params: Record<string, string | number | undefined>): string {
+// Mirrors the backend's `Product` struct field-for-field — the admin
+// product editor needs full detail, not the lighter `ProductCard` the
+// public consumer endpoints return.
+export interface Product {
+  id: string;
+  barcode: string;
+  country: string;
+  product_name: string;
+  brand: string | null;
+  image_url: string | null;
+  nutrition_facts: Record<string, unknown>;
+  ingredients: string | null;
+  allergens: string | null;
+  source: string;
+  verified: boolean;
+  verification_count: number;
+  confidence_score: number | null;
+  additives: unknown[] | null;
+  nova_group: number | null;
+  nutriscore_grade: string | null;
+  is_vegan: boolean | null;
+  is_vegetarian: boolean | null;
+  is_palm_oil_free: boolean | null;
+  category: string | null;
+  allergens_tags: string[] | null;
+  traces_tags: string[] | null;
+  labels_tags: string[] | null;
+  categories_tags: string[] | null;
+  nutrient_levels: Record<string, unknown> | null;
+  serving_size: string | null;
+  serving_quantity: number | null;
+  quantity: string | null;
+  nutriscore_score: number | null;
+  ecoscore_grade: string | null;
+  completeness: number | null;
+  off_synced_at: string | null;
+  off_last_modified: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminProductPage {
+  items: Product[];
+  total: number;
+}
+
+export interface AdminProductFilters {
+  q?: string;
+  country?: string;
+  verified?: boolean;
+  category?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Only the curated, admin-editable subset — see the backend's
+// `AdminUpdateProductRequest` doc comment for what's deliberately excluded
+// and why. All optional: send just the fields that changed.
+export interface AdminUpdateProductInput {
+  product_name?: string;
+  brand?: string;
+  category?: string;
+  ingredients?: string;
+  allergens?: string[];
+  image_url?: string;
+  quantity?: string;
+  nutrition_facts?: Record<string, unknown>;
+  additives?: unknown[];
+  nova_group?: number;
+  nutriscore_grade?: string;
+  is_vegan?: boolean;
+  is_vegetarian?: boolean;
+  is_palm_oil_free?: boolean;
+}
+
+function query(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) search.set(key, String(value));
@@ -197,10 +273,26 @@ export const api = {
       request<AdminSession>("/api/v1/admin/auth/register", { method: "POST", token, body: input }),
     remove: (token: string, id: string) =>
       request<{ removed: boolean }>(`/api/v1/admin/team/${id}`, { method: "DELETE", token }),
+    updatePermissions: (token: string, id: string, canEditProducts: boolean) =>
+      request<AdminProfile>(`/api/v1/admin/team/${id}/permissions`, {
+        method: "PATCH",
+        token,
+        body: { can_edit_products: canEditProducts },
+      }),
   },
 
   activity: {
     list: (token: string, filters: AuditLogFilters = {}) =>
       request<AuditLogPage>(`/api/v1/admin/activity${query({ ...filters })}`, { token }),
+  },
+
+  products: {
+    list: (token: string, filters: AdminProductFilters = {}) =>
+      request<AdminProductPage>(`/api/v1/admin/products${query({ ...filters })}`, { token }),
+    get: (token: string, id: string) => request<Product>(`/api/v1/admin/products/${id}`, { token }),
+    update: (token: string, id: string, patch: AdminUpdateProductInput) =>
+      request<Product>(`/api/v1/admin/products/${id}`, { method: "PATCH", token, body: patch }),
+    verify: (token: string, id: string, verified: boolean) =>
+      request<Product>(`/api/v1/admin/products/${id}/verify`, { method: "POST", token, body: { verified } }),
   },
 };

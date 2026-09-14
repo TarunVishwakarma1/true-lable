@@ -55,6 +55,20 @@ export default function TeamPage() {
     }
   }
 
+  async function setProductPermission(id: string, canEditProducts: boolean) {
+    if (!token) return;
+    setPendingId(id);
+    setError(null);
+    try {
+      const updated = await api.team.updatePermissions(token, id, canEditProducts);
+      setTeam((prev) => prev.map((m) => (m.id === id ? updated : m)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't change that permission.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   async function submitInvite() {
     if (!token) return;
     setInviteBusy(true);
@@ -207,15 +221,28 @@ export default function TeamPage() {
                     <td className="px-4 py-3 text-muted">{member.occupation ?? "—"}</td>
                     <td className="px-4 py-3">
                       {me?.role === "admin" ? (
-                        <select
-                          value={member.role}
-                          disabled={pendingId === member.id}
-                          onChange={(e) => setRole(member.id, e.target.value as "admin" | "member")}
-                          className="h-8 rounded-md border border-line bg-surface px-2 text-xs text-fg capitalize outline-none focus:border-accent disabled:opacity-50"
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="member">Member</option>
-                        </select>
+                        <div className="flex flex-col gap-1.5">
+                          <select
+                            value={member.role}
+                            disabled={pendingId === member.id}
+                            onChange={(e) => setRole(member.id, e.target.value as "admin" | "member")}
+                            className="h-8 rounded-md border border-line bg-surface px-2 text-xs text-fg capitalize outline-none focus:border-accent disabled:opacity-50"
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="member">Member</option>
+                          </select>
+                          {member.role === "member" && (
+                            <label className="flex items-center gap-1.5 text-xs text-muted">
+                              <input
+                                type="checkbox"
+                                checked={member.can_edit_products}
+                                disabled={pendingId === member.id}
+                                onChange={(e) => setProductPermission(member.id, e.target.checked)}
+                              />
+                              Can edit products
+                            </label>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-fg capitalize">{member.role}</span>
                       )}

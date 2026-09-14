@@ -51,3 +51,14 @@ export function PlatformBadge({ platform }: { platform: string }) {
     </span>
   );
 }
+
+export function VerifiedBadge({ verified }: { verified: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-medium ${verified ? "text-fg" : "text-muted"}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${verified ? "bg-emerald-400" : "bg-zinc-500"}`} aria-hidden />
+      {verified ? "Verified" : "Unverified"}
+    </span>
+  );
+}

@@ -19,6 +19,7 @@ const profile = {
   email: "ada@example.com",
   occupation: null,
   role: "member" as const,
+  can_edit_products: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 
