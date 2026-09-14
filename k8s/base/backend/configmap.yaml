@@ -39,3 +39,12 @@ data:
   # this API from a browser — truelabel.fun (marketing) and docs.truelabel.fun
   # are both static content with no backend calls, so neither is listed here.
   ALLOWED_ORIGINS: "https://dashboard.truelabel.fun"
+
+  # `owner/repo` the dashboard's "publish as GitHub issue" button files
+  # against. Not secret by itself — GITHUB_TOKEN (the actual credential) is
+  # in backend-secrets, not here. Leaving this unset (or GITHUB_TOKEN unset)
+  # just makes that one button fail with a clear error; nothing else breaks.
+  GITHUB_REPO: "TarunVishwakarma1/true-lable"
+
+  # Lets a filed GitHub issue link back to the crash report it came from.
+  DASHBOARD_URL: "https://dashboard.truelabel.fun"

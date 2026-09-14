@@ -218,10 +218,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Grants access to the `production` environment's secrets
-    # (DIGITALOCEAN_ACCESS_TOKEN, PROD_DATABASE_URL, PROD_REDIS_URL) — real
-    # cluster and database credentials, unlike DOCKERHUB_*, which every
-    # branch's build job needs and stays a plain repo secret. Without this
-    # line, environment-scoped secrets resolve empty even if they exist.
+    # (DIGITALOCEAN_ACCESS_TOKEN, PROD_DATABASE_URL, PROD_REDIS_URL,
+    # PROD_GITHUB_TOKEN) — real cluster/database/API credentials, unlike
+    # DOCKERHUB_*, which every branch's build job needs and stays a plain
+    # repo secret. Without this line, environment-scoped secrets resolve
+    # empty even if they exist. PROD_GITHUB_TOKEN is optional — omit it and
+    # the dashboard's "publish as GitHub issue" button just fails with a
+    # clear error; nothing else depends on it.
     environment: production
     steps:
       - uses: actions/checkout@v7
@@ -249,6 +252,7 @@ jobs:
           kubectl create secret generic backend-secrets -n true-label \
             --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
             --from-literal=REDIS_URL="${{ secrets.PROD_REDIS_URL }}" \
+            --from-literal=GITHUB_TOKEN="${{ secrets.PROD_GITHUB_TOKEN }}" \
             --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret generic dashboard-secrets -n true-label \
             --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \

@@ -78,13 +78,21 @@ submitted → pending → in_review → in_progress → done
 `POST .../github-issue` is the one action gated to the `admin` role
 specifically rather than any signed-in staff account — it reaches a third
 party and leaves a permanent public trace, unlike triaging a status. It
-formats the report into a real issue body (description, a platform/
-severity/version table, a collapsible stack trace) and writes the
-resulting `github_issue_number` / `github_issue_url` back onto the row. A
-report that already has one refuses with `409 Conflict` rather than
-opening a duplicate. Needs `GITHUB_TOKEN` (a PAT with `Issues: write` on
-`GITHUB_REPO`) configured on the backend — unset, this one endpoint fails
-with a clear error and everything else keeps working.
+formats the report as a real issue body, reading like a detailed report a
+person actually filed rather than a raw data dump: a Description section, an
+Environment table (platform, severity with a colored emoji, source —
+distinguishing an automatic MetricKit crash from one a named staff member
+filed manually, app/OS version, device model, reported-at, and a device
+correlation id when present), a collapsible stack trace, and a collapsible
+Additional Metadata block whenever the report carries any. The footer links
+back to the report in the dashboard when `DASHBOARD_URL` is configured. It
+writes the resulting `github_issue_number` / `github_issue_url` back onto
+the row, and a report that already has one refuses with `409 Conflict`
+rather than opening a duplicate. Needs `GITHUB_TOKEN` (a PAT with
+`Issues: write` on `GITHUB_REPO`) configured on the backend — unset, this
+one endpoint fails with a clear error and everything else keeps working.
+`DASHBOARD_URL` is optional too; unset, the issue is just missing that one
+link.
 
 `POST` (file by hand) takes the same body as the public submit endpoint
 above, but sets `source: "manual"` and `reported_by` to the caller instead

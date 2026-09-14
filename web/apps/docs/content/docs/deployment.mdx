@@ -129,6 +129,7 @@ meant to be committed), and `*.tfvars`.
 | `DIGITALOCEAN_ACCESS_TOKEN` | DO console → API. Scope it as narrowly as the console allows. |
 | `PROD_DATABASE_URL` | Neon project → Connection string (`postgresql://...neon.tech/truelabel?sslmode=require`) |
 | `PROD_REDIS_URL` | Upstash database → `rediss://...upstash.io:6379` — TLS, matches the `rediss://` scheme the backend's `redis` crate already supports |
+| `PROD_GITHUB_TOKEN` | Optional. GitHub → Settings → Developer settings → a fine-grained PAT scoped to `Issues: write` on this repo. Powers the dashboard's "publish as GitHub issue" button only — omit it and everything else still works, that one button just fails with a clear error. |
 
 CI creates/updates `backend-secrets` and `dashboard-secrets` in the cluster
 from these on every deploy to `main` (see `.github/workflows/ci-cd.yml`'s
