@@ -1,0 +1,38 @@
+# Ownership boundaries by directory — GitHub suggests (and, once branch
+# protection is turned on to require it, enforces) review from whoever
+# owns a path a PR touches. Last matching pattern wins, same rule as
+# .gitignore, so put broader patterns first and narrower overrides after.
+#
+# Everything defaults to @TarunVishwakarma1 today (solo repo) — the point
+# of splitting these lines now, rather than one catch-all, is that handing
+# a piece to someone else later is a one-line edit here, not a restructure.
+# Chosen as the CODEOWNERS-only alternative to physically splitting
+# web/apps/{web,docs,dashboard} into separate repos: they share a live
+# design system (packages/ui) that a real repo split would force behind a
+# publish step, which isn't worth it for three lightweight Next.js apps.
+
+*                           @TarunVishwakarma1
+
+# backend/ and ios/truelable/ are git submodules — this only covers the
+# pointer bump in this repo, not their own commit history (each has its
+# own repo and could carry its own CODEOWNERS if that ever matters):
+#   https://github.com/TarunVishwakarma1/true-label-backend
+#   https://github.com/TarunVishwakarma1/true-label-ios
+/backend                    @TarunVishwakarma1
+/ios/truelable              @TarunVishwakarma1
+
+/web/apps/web/              @TarunVishwakarma1
+/web/apps/docs/             @TarunVishwakarma1
+/web/apps/dashboard/        @TarunVishwakarma1
+
+# Shared by all three apps above (design tokens, theme-toggle, providers)
+# — a change here ripples into every app's build, so it's worth a
+# deliberate owner even before there's a second person to hand it to.
+/web/packages/               @TarunVishwakarma1
+
+/k8s/                        @TarunVishwakarma1
+/infra/                      @TarunVishwakarma1
+/deploy/                     @TarunVishwakarma1
+
+# CI/CD and repo automation — changes here affect every branch's pipeline.
+/.github/                    @TarunVishwakarma1
