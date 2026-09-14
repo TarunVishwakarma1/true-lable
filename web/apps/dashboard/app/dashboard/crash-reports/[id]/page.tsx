@@ -133,6 +133,8 @@ export default function CrashReportDetailPage() {
               <PlatformBadge platform={report.platform} />
             </Property>
 
+            <Property label="Source">{report.source === "manual" ? "Filed manually" : "App"}</Property>
+
             {report.app_version && <Property label="App version">{report.app_version}</Property>}
             {report.os_version && <Property label="OS version">{report.os_version}</Property>}
             {report.device_model && <Property label="Device">{report.device_model}</Property>}

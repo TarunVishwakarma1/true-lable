@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Plus, Search } from "lucide-react";
 import { STATUS_LABEL, PlatformBadge, SeverityBadge, StatusBadge } from "../../components/badges";
 import {
   api,
@@ -27,8 +29,18 @@ export default function CrashReportsPage() {
   const [status, setStatus] = useState<ReportStatus | "">("");
   const [platform, setPlatform] = useState<Platform | "">("");
   const [severity, setSeverity] = useState<Severity | "">("");
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setOffset(0);
+      setDebouncedQ(q);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
   useEffect(() => {
     if (!token) return;
@@ -50,6 +62,7 @@ export default function CrashReportsPage() {
         status: status || undefined,
         platform: platform || undefined,
         severity: severity || undefined,
+        q: debouncedQ || undefined,
         limit: PAGE_SIZE,
         offset,
       })
@@ -59,7 +72,7 @@ export default function CrashReportsPage() {
       })
       .catch(() => setError("Couldn't load crash reports."))
       .finally(() => setLoading(false));
-  }, [token, status, platform, severity, offset]);
+  }, [token, status, platform, severity, debouncedQ, offset]);
 
   function resetAnd<T>(setter: (v: T) => void) {
     return (v: T) => {
@@ -74,8 +87,19 @@ export default function CrashReportsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-8 py-10">
-      <h1 className="text-xl font-medium text-fg">Crash Reports</h1>
-      <p className="mt-1 text-sm text-muted">{total} total</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-medium text-fg">Crash Reports</h1>
+          <p className="mt-1 text-sm text-muted">{total} total</p>
+        </div>
+        <Link
+          href="/dashboard/crash-reports/new"
+          className="flex h-9 items-center gap-1.5 rounded-lg bg-fg px-3.5 text-sm font-medium text-bg transition-opacity hover:opacity-90"
+        >
+          <Plus size={15} />
+          New report
+        </Link>
+      </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-6">
         {STATUSES.map((s) => (
@@ -92,7 +116,16 @@ export default function CrashReportsPage() {
         ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-2">
+      <div className="mt-8 flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search reports…"
+            className="h-8 w-52 rounded-md border border-line bg-surface pr-2.5 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
+          />
+        </div>
         <Select label="Platform" value={platform} onChange={resetAnd(setPlatform)} options={PLATFORMS} />
         <Select label="Severity" value={severity} onChange={resetAnd(setSeverity)} options={SEVERITIES} />
         {status && (

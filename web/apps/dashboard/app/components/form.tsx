@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ButtonHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 export function Field({
   label,
@@ -25,6 +25,24 @@ export function TextField(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={`h-11 w-full rounded-lg border border-line bg-surface px-3.5 text-sm text-fg outline-none transition-colors placeholder:text-muted/60 focus:border-accent ${props.className ?? ""}`}
+    />
+  );
+}
+
+export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      {...props}
+      className={`w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm text-fg outline-none transition-colors placeholder:text-muted/60 focus:border-accent ${props.className ?? ""}`}
+    />
+  );
+}
+
+export function SelectField(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={`h-11 w-full rounded-lg border border-line bg-surface px-3.5 text-sm text-fg capitalize outline-none transition-colors focus:border-accent ${props.className ?? ""}`}
     />
   );
 }

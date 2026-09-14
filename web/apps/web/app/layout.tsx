@@ -35,6 +35,16 @@ export const metadata: Metadata = {
     locale: "en_IN",
   },
   twitter: { card: "summary_large_image" },
+  icons: {
+    // Follows the OS theme, not the in-app toggle — a favicon can't react
+    // to a class on <html>, only to prefers-color-scheme. The Apple touch
+    // icon needs no such split: app/apple-icon.png is picked up on its own
+    // by Next's file convention.
+    icon: [
+      { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

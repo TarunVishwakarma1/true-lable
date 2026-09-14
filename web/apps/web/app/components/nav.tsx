@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { Container } from "@repo/ui/container";
 import { SoundToggle } from "@repo/ui/sound";
@@ -40,8 +41,23 @@ export function Nav() {
         }`}
       >
         <Container className="flex h-16 items-center justify-between">
-          <a href="#top" className="text-[17px] font-medium tracking-tight" aria-label="TrueLabel home">
-            True<span className="text-accent">Label</span>
+          <a href="#top" aria-label="TrueLabel home" className="block h-9 w-9 shrink-0">
+            <Image
+              src="/brand/logo-light.png"
+              alt="TrueLabel"
+              width={128}
+              height={128}
+              priority
+              className="h-9 w-9 rounded-md dark:hidden"
+            />
+            <Image
+              src="/brand/logo-dark.png"
+              alt="TrueLabel"
+              width={128}
+              height={128}
+              priority
+              className="hidden h-9 w-9 rounded-md dark:block"
+            />
           </a>
 
           <nav aria-label="Primary" className="hidden items-center gap-8 text-sm md:flex">

@@ -84,11 +84,14 @@ html {
   scrollbar-color: var(--line) transparent;
 }
 
-/* The theme toggle animates ::view-transition-new(root) itself. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+.vt-active * {
+  transition: none !important;
 }
 
 /* Custom cursor: only where a fine pointer exists, and only on pages that

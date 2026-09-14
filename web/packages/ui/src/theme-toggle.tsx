@@ -2,8 +2,6 @@
 
 import { useEffect, useState, type MouseEvent } from "react";
 
-// Module-scoped: a second click while a transition is still in flight would make
-// document.startViewTransition() reject, so just skip the wipe and flip directly.
 let inFlight = false;
 
 export function ThemeToggle() {
@@ -24,23 +22,25 @@ export function ThemeToggle() {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!document.startViewTransition || reduced || inFlight) return apply();
 
-    // Circular wipe from the click point, using the native View Transition API.
     const x = e.clientX;
     const y = e.clientY;
     const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
     inFlight = true;
+    document.documentElement.classList.add("vt-active");
     const transition = document.startViewTransition(apply);
-    transition.finished.finally(() => {
-      inFlight = false;
-    });
     transition.ready
       .then(() => {
-        document.documentElement.animate(
+        const wipe = document.documentElement.animate(
           { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
           { duration: 650, easing: "cubic-bezier(0.16, 1, 0.3, 1)", pseudoElement: "::view-transition-new(root)" },
         );
+        return wipe.finished;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        inFlight = false;
+        document.documentElement.classList.remove("vt-active");
+      });
   }
 
   return (

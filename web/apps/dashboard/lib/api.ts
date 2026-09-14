@@ -96,8 +96,20 @@ export interface CrashReportFilters {
   status?: ReportStatus;
   platform?: Platform;
   severity?: Severity;
+  q?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface CreateCrashReportInput {
+  platform: Platform;
+  title: string;
+  description?: string;
+  stack_trace?: string;
+  app_version?: string;
+  os_version?: string;
+  device_model?: string;
+  severity?: Severity;
 }
 
 export interface GitHubIssueRef {
@@ -128,6 +140,8 @@ export const api = {
       request<CrashReportPage>(`/api/v1/admin/crash-reports${query({ ...filters })}`, { token }),
     get: (token: string, id: string) =>
       request<CrashReport>(`/api/v1/admin/crash-reports/${id}`, { token }),
+    create: (token: string, input: CreateCrashReportInput) =>
+      request<CrashReport>("/api/v1/admin/crash-reports", { method: "POST", token, body: input }),
     update: (token: string, id: string, patch: { status?: ReportStatus; severity?: Severity }) =>
       request<CrashReport>(`/api/v1/admin/crash-reports/${id}`, {
         method: "PATCH",
