@@ -48,7 +48,7 @@ sequenceDiagram
     participant API as Backend
     participant Redis
     participant DB as Postgres
-    participant OFF as Open Food Facts
+    participant FoodFacts as Open Food Facts
 
     User->>iOS: Scans barcode
     iOS->>API: GET /api/v1/products/search?barcode=...&country=IN
@@ -59,9 +59,9 @@ sequenceDiagram
         API->>DB: Query by (barcode, country)
         DB-->>API: Product row
         API->>Redis: Cache it
-    else Neither — ask Open Food Facts
-        API->>OFF: Fetch by barcode (rate-limited, 12/min)
-        OFF-->>API: Product data
+    else Neither, ask Open Food Facts
+        API->>FoodFacts: Fetch by barcode (rate-limited, 12/min)
+        FoodFacts-->>API: Product data
         API->>DB: Insert (source = open_food_facts)
         API->>Redis: Cache it
     end

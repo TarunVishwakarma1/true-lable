@@ -1,9 +1,14 @@
 import { defineDocs, defineConfig } from "fumadocs-mdx/config";
+import { remarkMermaid } from "./lib/remark-mermaid";
 
 export const docs = defineDocs({
   dir: "content/docs",
 });
 
 export default defineConfig({
-  mdxOptions: {},
+  mdxOptions: {
+    // Appended, not replacing the defaults — Fumadocs' own remark plugins
+    // (frontmatter, GFM, etc.) still need to run.
+    remarkPlugins: (v) => [...v, remarkMermaid],
+  },
 });
