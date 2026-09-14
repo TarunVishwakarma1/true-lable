@@ -99,23 +99,77 @@ above, but sets `source: "manual"` and `reported_by` to the caller instead
 of `source: "app"` — the distinction that lets the dashboard tell "the app
 reported this itself" from "a person typed this in."
 
+## GitHub status sync
+
+Once a report is published, its status stays in sync with the linked issue
+in both directions — nobody has to remember to check GitHub by hand.
+
+**Dashboard → GitHub.** `PATCH .../crash-reports/{id}` with a `status`, on a
+report that has a linked issue, also updates the issue: `done` closes it as
+completed, `wont_fix` closes it as not planned, any of the other four
+statuses reopens it if it was closed. Best-effort — a GitHub API hiccup logs
+a warning and never blocks the dashboard-side status change that triggered
+it.
+
+**GitHub → dashboard.**
+```
+POST /api/v1/webhooks/github — no bearer token, verified by signature instead
+```
+A repo webhook (Settings → Webhooks → Payload URL
+`https://api.truelabel.fun/api/v1/webhooks/github`, content type
+`application/json`, subscribed to **Issues** only) authenticated via
+`X-Hub-Signature-256` — HMAC-SHA256 over the raw body, keyed by
+`GITHUB_WEBHOOK_SECRET`. Unset, the endpoint refuses every delivery; there's
+no way to trust an unsigned one. Closing an issue on GitHub maps to `done`
+(or `wont_fix` if closed as "not planned"); reopening maps to `in_progress`.
+Every other event — `ping` (sent the moment the webhook is saved, and on
+every manual redeliver), and anything on an issue that isn't one of ours —
+is a silent `200`, not an error, since this webhook fires for every issue in
+the repo, not just crash reports.
+
+<Callout type="info" title="Why this can't loop">
+  The webhook handler never calls the GitHub API — it only ever writes to
+  the database, through a code path with no reference to `GitHubService` in
+  scope at all. The outbound half above lives entirely in the dashboard's
+  own `PATCH` handler. Two one-directional paths sharing a table, not a
+  literal round trip.
+</Callout>
+
 ## Team
 
 ```
-GET   /api/v1/admin/team               — any signed-in staff account
-PATCH /api/v1/admin/team/{id}/role      { role: "admin" | "member" }  — admin role only
-PATCH /api/v1/admin/team/{id}/password  { new_password }              — admin role only
+GET    /api/v1/admin/team                    — any signed-in staff account
+PATCH  /api/v1/admin/team/{id}/role           { role: "admin" | "member" }        — admin role only
+PATCH  /api/v1/admin/team/{id}/password       { new_password }                    — admin role only
+PATCH  /api/v1/admin/team/{id}/permissions    { can_edit_products: boolean }      — admin role only
+DELETE /api/v1/admin/team/{id}                                                    — admin role only
 ```
+
+Inviting a teammate is just the same `POST /api/v1/admin/auth/register` used
+for the very first account, called with an existing admin's own bearer
+token attached — see
+[Authentication → Dashboard staff accounts](/docs/backend/authentication#dashboard-staff-accounts).
 
 ```json
 [
-  { "id": "…", "name": "Tarun", "email": "…", "occupation": "SDE", "role": "admin", "created_at": "…" }
+  { "id": "…", "name": "Tarun", "email": "…", "occupation": "SDE", "role": "admin", "can_edit_products": false, "created_at": "…" }
 ]
 ```
 
 Changing a role refuses with `409 Conflict` if it would demote the last
 remaining admin — otherwise the team could lock itself out with no way
-back short of a direct database edit.
+back short of a direct database edit. Removing a teammate has the same
+last-admin guard, plus a self-removal guard (`409 Conflict` either way) —
+nobody can remove their own account. `crash_reports.reported_by` already
+references `dashboard_users(id) ON DELETE SET NULL`, so a removed account's
+past reports and audit-log entries stay readable; the audit log also keeps
+a denormalized name snapshot for exactly this case.
+
+`can_edit_products` is the one thing `role` doesn't already cover: an admin
+can edit any product regardless of this flag, but a `member` needs it set
+before `PATCH /api/v1/admin/products/{id}` accepts anything from them — see
+[Products](#products). It never grants the separate `/verify` action, which
+stays admin-only.
 
 Resetting a password takes no current-password check — the caller's own
 admin session is the authority, same posture as changing a role. For a
@@ -124,3 +178,18 @@ endpoint above, which does check it). Doesn't invalidate the target's
 existing session token; they stay signed in on whatever device they're
 already on, and just need the new password next time they log in
 elsewhere.
+
+## Activity
+
+```
+GET /api/v1/admin/activity — admin role only. Query: action?, target_type?, limit, offset
+```
+
+Who changed what: role changes, password resets, invites, removals, crash
+report status changes (dashboard-initiated or synced in from a GitHub
+webhook — `actor_name: "GitHub"`, `actor_id: null` for the latter),
+publishing to GitHub, and product edits/verifications. Admin-only to view —
+tighter than crash reports' "any signed-in staff," since this surfaces
+password resets and role changes. `actor_name` is a snapshot taken at write
+time, not a live join, so a removed teammate's history still reads
+correctly.

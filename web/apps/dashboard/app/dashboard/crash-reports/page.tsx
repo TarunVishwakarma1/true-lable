@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { STATUS_LABEL, PlatformBadge, SeverityBadge, StatusBadge } from "../../components/badges";
+import { SkeletonRows } from "../../components/skeleton";
 import {
   api,
   type CrashReport,
@@ -140,7 +141,7 @@ export default function CrashReportsPage() {
 
       <div className="mt-4 overflow-hidden rounded-xl border border-line">
         {loading ? (
-          <p className="p-6 text-sm text-muted">Loading…</p>
+          <SkeletonRows rows={8} cols={5} />
         ) : error ? (
           <p className="p-6 text-sm text-red-400">{error}</p>
         ) : items.length === 0 ? (

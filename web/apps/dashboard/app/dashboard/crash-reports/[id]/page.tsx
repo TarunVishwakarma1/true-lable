@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, Github } from "lucide-react";
 import { STATUS_LABEL, PlatformBadge, SeverityBadge } from "../../../components/badges";
+import { Skeleton } from "../../../components/skeleton";
 import { ApiError, api, type CrashReport, type ReportStatus, type Severity } from "../../../../lib/api";
 import { useAuth } from "../../../../lib/auth-context";
 
@@ -55,7 +56,25 @@ export default function CrashReportDetailPage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-4xl px-8 py-10">
-        <p className="text-sm text-muted">Loading…</p>
+        <Skeleton className="h-4 w-32" />
+        <div className="mt-4 flex flex-col gap-8 sm:flex-row">
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="mt-3 h-4 w-full" />
+            <Skeleton className="mt-2 h-4 w-5/6" />
+          </div>
+          <aside className="w-full shrink-0 sm:w-56">
+            <div className="rounded-xl border border-line p-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-0">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="mt-3 h-9 w-full rounded-lg" />
+          </aside>
+        </div>
       </main>
     );
   }

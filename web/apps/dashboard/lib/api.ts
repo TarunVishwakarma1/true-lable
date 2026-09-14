@@ -118,6 +118,29 @@ export interface GitHubIssueRef {
   url: string;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  actor_name: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AuditLogPage {
+  items: AuditLogEntry[];
+  total: number;
+}
+
+export interface AuditLogFilters {
+  action?: string;
+  target_type?: string;
+  limit?: number;
+  offset?: number;
+}
+
 function query(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -160,5 +183,24 @@ export const api = {
     list: (token: string) => request<AdminProfile[]>("/api/v1/admin/team", { token }),
     updateRole: (token: string, id: string, role: "admin" | "member") =>
       request<AdminProfile>(`/api/v1/admin/team/${id}/role`, { method: "PATCH", token, body: { role } }),
+    resetPassword: (token: string, id: string, newPassword: string) =>
+      request<{ reset: boolean }>(`/api/v1/admin/team/${id}/password`, {
+        method: "PATCH",
+        token,
+        body: { new_password: newPassword },
+      }),
+    // Deliberately not `api.register` — that call never attaches a token,
+    // so the backend would see no calling admin and refuse every invite
+    // past the first account. Same endpoint, invite just carries the
+    // inviting admin's own session.
+    invite: (token: string, input: RegisterInput) =>
+      request<AdminSession>("/api/v1/admin/auth/register", { method: "POST", token, body: input }),
+    remove: (token: string, id: string) =>
+      request<{ removed: boolean }>(`/api/v1/admin/team/${id}`, { method: "DELETE", token }),
+  },
+
+  activity: {
+    list: (token: string, filters: AuditLogFilters = {}) =>
+      request<AuditLogPage>(`/api/v1/admin/activity${query({ ...filters })}`, { token }),
   },
 };

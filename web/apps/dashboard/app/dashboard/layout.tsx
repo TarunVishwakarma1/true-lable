@@ -4,14 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { BookOpen, Bug, LayoutGrid, LogOut, Users } from "lucide-react";
+import { Activity, BookOpen, Bug, LayoutGrid, LogOut, Users } from "lucide-react";
 import { ThemeToggle } from "@repo/ui/theme-toggle";
 import { useAuth } from "../../lib/auth-context";
+import { Skeleton } from "../components/skeleton";
 
 const LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
   { href: "/dashboard/crash-reports", label: "Crash Reports", icon: Bug },
   { href: "/dashboard/team", label: "Team", icon: Users },
+  { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/resources", label: "Resources", icon: BookOpen },
 ];
 
@@ -27,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading || !profile) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <p className="font-mono text-xs text-muted uppercase">Loading…</p>
+        <Skeleton className="h-8 w-8 rounded-full" />
       </main>
     );
   }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { STATUS_LABEL } from "../components/badges";
+import { Skeleton } from "../components/skeleton";
 import { api, type CrashReport, type ReportStatus } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
@@ -60,14 +61,17 @@ export default function DashboardHome() {
       <p className="mt-1 text-sm text-muted">{profile?.email}</p>
 
       <div className="mt-8 grid grid-cols-3 gap-3">
-        <StatTile label="Total reports" value={loading ? "–" : total} />
-        <StatTile label="Open work" value={loading ? "–" : open} />
-        <StatTile label="Done" value={loading ? "–" : (counts.done ?? 0)} />
+        <StatTile label="Total reports" value={total} loading={loading} />
+        <StatTile label="Open work" value={open} loading={loading} />
+        <StatTile label="Done" value={counts.done ?? 0} loading={loading} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="rounded-xl border border-line p-5 lg:col-span-3">
           <p className="text-sm font-medium text-fg">Reports, last {TREND_DAYS} days</p>
+          {loading ? (
+            <Skeleton className="mt-4 h-48 w-full" />
+          ) : (
           <div className="mt-4 h-48">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
@@ -105,26 +109,29 @@ export default function DashboardHome() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-line p-5 lg:col-span-2">
           <p className="text-sm font-medium text-fg">By status</p>
           <div className="mt-4 flex flex-col gap-3">
-            {STATUSES.map((s) => {
-              const count = counts[s] ?? 0;
-              return (
-                <div key={s} className="flex items-center gap-3 text-xs">
-                  <span className="w-20 shrink-0 text-muted">{STATUS_LABEL[s]}</span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-fg/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-fg/70"
-                      style={{ width: `${(count / maxStatusCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-6 shrink-0 text-right tabular-nums text-fg">{count}</span>
-                </div>
-              );
-            })}
+            {loading
+              ? STATUSES.map((s) => <Skeleton key={s} className="h-4 w-full" />)
+              : STATUSES.map((s) => {
+                  const count = counts[s] ?? 0;
+                  return (
+                    <div key={s} className="flex items-center gap-3 text-xs">
+                      <span className="w-20 shrink-0 text-muted">{STATUS_LABEL[s]}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-fg/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-fg/70"
+                          style={{ width: `${(count / maxStatusCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-6 shrink-0 text-right tabular-nums text-fg">{count}</span>
+                    </div>
+                  );
+                })}
           </div>
         </div>
       </div>
@@ -132,10 +139,14 @@ export default function DashboardHome() {
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string | number }) {
+function StatTile({ label, value, loading }: { label: string; value: number; loading: boolean }) {
   return (
     <div className="rounded-xl border border-line p-4">
-      <p className="text-2xl font-medium tabular-nums text-fg">{value}</p>
+      {loading ? (
+        <Skeleton className="h-8 w-12" />
+      ) : (
+        <p className="text-2xl font-medium tabular-nums text-fg">{value}</p>
+      )}
       <p className="mt-1 text-xs text-muted">{label}</p>
     </div>
   );
