@@ -202,8 +202,7 @@ sequenceDiagram
     iOS1->>Vision: Extract text on-device (no network)
     Vision-->>iOS1: Raw text
     iOS1->>API: POST /api/v1/ocr/submit (extracted_text, reviewed_ingredients)
-    API->>API: Compare extracted_text vs reviewed_ingredients
-    (ingredient_overlap_ratio)
+    API->>API: Compare extracted_text vs reviewed_ingredients<br/>(ingredient_overlap_ratio)
     API->>DB: Insert ocr_submissions + unverified product
     API-->>iOS1: pending_verification / flagged_low_confidence
     User1->>iOS1: Reviews and confirms
@@ -915,7 +914,7 @@ true-lable/
 │   ├── apps/docs/                  # Developer docs (Fumadocs)
 │   ├── apps/dashboard/             # Internal admin dashboard — crash reports, team, resources
 │   └── packages/{ui,eslint-config,typescript-config}/
-├── deploy/                          # Superseded droplet setup — kept as reference only
+├── deploy/                          # Single-VM deploy (EC2 or DO droplet) — the low-cost path
 ├── .github/                          # Issue/PR templates, CI/CD (builds + deploys to DOKS)
 ├── k8s/                              # Kustomize base + overlays — real production deployment
 ├── infra/digitalocean/               # Terraform for the DOKS cluster itself
@@ -933,7 +932,7 @@ true-lable/
 | **OCR** | **On-device Apple Vision** (`DataScannerViewController`, text mode) | No photo ever leaves the device, zero OCR API cost, no image-storage requirement. Confidence comes from server-side `ingredient_overlap_ratio` against reviewed text, not a vendor score. | *Cloud OCR (Google/AWS Vision)* — rejected: recurring cost, requires image upload/storage, adds a network round-trip to every contribution. |
 | **Auth** | **Device bearer token** (+ optional Sign in with Apple) | No password to leak; only `SHA-256(token)` is stored; device id never appears in a URL. | *Full account system* — deferred; Apple Sign-In is implemented server-side but off client-side pending a paid Apple Developer team. |
 | **Backend Framework** | **Rust (Axum + Tokio)** | Memory safety, low resource footprint, strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
-| **Production hosting** | **DigitalOcean Kubernetes (DOKS)** | One ingress + one DO Load Balancer routes 4 subdomains to 4 apps; Postgres/Redis are external (Neon/Upstash), so the cluster only ever runs stateless pods. | *Single droplet, nginx + systemd* — simpler, and was live briefly, but doesn't scale past one app/one domain without a proxy config edit per addition; kept as reference in `deploy/`. |
+| **Production hosting** | **DigitalOcean Kubernetes (DOKS)**, or a single EC2/droplet VM (`deploy/`) for lower cost | k8s: one ingress + one DO Load Balancer routes 4 subdomains to 4 apps. VM: one binary behind nginx behind systemd, provider-agnostic. Both read the same `DATABASE_URL`/`REDIS_URL` (Neon/Upstash) — nothing about the app changes between them, only how much it costs and scales. | *AWS EKS* — was built out (`infra/aws/`) but never deployed to; kept as reference only. |
 
 ---
 
@@ -973,9 +972,14 @@ Count < 3   Count ≥ 3
 
 ## 🚀 Deployment & Infrastructure
 
-Production runs on **DigitalOcean Kubernetes (DOKS)**. One ingress
-(ingress-nginx, one DO Load Balancer) routes four hostnames to four
-Deployments; cert-manager keeps all four on Let's Encrypt TLS:
+Two deployment paths exist, both reading the exact same
+`DATABASE_URL`/`REDIS_URL` — pick based on scale, not because the app
+changes between them.
+
+### Kubernetes (DigitalOcean, `k8s/` + `infra/digitalocean/`)
+
+One ingress (ingress-nginx, one DO Load Balancer) routes four hostnames to
+four Deployments; cert-manager keeps all four on Let's Encrypt TLS:
 
 ```
 truelabel.fun            → web        (marketing)
@@ -1005,9 +1009,14 @@ appends to `X-Forwarded-For` here (DO's Load Balancer is L4 and doesn't
 touch HTTP headers), so rate limiting reads the real client IP rather than
 a spoofable header or, worse, one shared bucket for the whole internet.
 
-`deploy/` (droplet + nginx + systemd) briefly *was* production and is kept
-as reference for a possible future bare-metal move, but is superseded —
-see that directory's README for the note.
+### Single VM — EC2 or a DO droplet (`deploy/`)
+
+The low-cost alternative when traffic doesn't justify a cluster: one binary
+behind nginx behind systemd, provider-agnostic (the same files work on
+either EC2 or a droplet — only provisioning the VM itself differs). See
+[`deploy/README.md`](deploy/README.md) for the full setup, including where
+to get a TLS cert and the same `TRUSTED_PROXY_HOPS` reasoning as above,
+adapted for nginx instead of ingress-nginx.
 
 ---
 
