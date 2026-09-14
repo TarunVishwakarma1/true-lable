@@ -9,16 +9,37 @@ resources:
   - web/deployment.yaml
   - web/service.yaml
   - web/hpa.yaml
-  - postgres/deployment.yaml
-  - postgres/service.yaml
-  - postgres/pvc.yaml
-  - redis/deployment.yaml
-  - redis/service.yaml
-  - networkpolicy.yaml
-  # ingress.yaml intentionally excluded — see that file's header comment.
+  - dashboard/deployment.yaml
+  - dashboard/service.yaml
+  - dashboard/hpa.yaml
+  - docs/deployment.yaml
+  - docs/service.yaml
+  - docs/hpa.yaml
+  # Ingress lives in overlays/main/ingress.yaml, not here — dev/sit/test
+  # overlays pull in this same base, and an Ingress claiming the real
+  # hostnames from three namespaces at once would fight itself. Only main
+  # (the one bound to the real domain) needs it, so it isn't shared base.
+  #
+  # cert-manager/cluster-issuer.yaml is cluster-scoped (not namespaced) and
+  # a one-time bootstrap object, so it's applied standalone, once, outside
+  # any kustomization — see docs/deployment.mdx. Folding a cluster-scoped
+  # CRD into a namespaced kustomization is a known rough edge (kustomize can
+  # try to stamp a namespace onto it), not worth fighting for a resource
+  # that's created once and never re-applied per deploy.
+  #
+  # postgres/, redis/ and networkpolicy.yaml intentionally excluded: Postgres
+  # is Neon and Redis is Upstash now, both external and reached over the
+  # network, not in-cluster — see backend/secret.example.yaml. The manifests
+  # stay on disk rather than being deleted, for the day this moves to
+  # self-hosted bare metal and an in-cluster (or at least self-run) Postgres
+  # and Redis are wanted again.
 
 images:
   - name: tarunvishwakarma/true-lable-backend
     newTag: latest
   - name: tarunvishwakarma/true-lable-web
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-dashboard
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-docs
     newTag: latest

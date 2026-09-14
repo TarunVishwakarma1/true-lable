@@ -1,3 +1,9 @@
+> **Superseded.** Production now runs on DigitalOcean Kubernetes — see
+> [`docs/deployment.mdx`](../web/apps/docs/content/docs/deployment.mdx). This
+> droplet setup is kept only as a reference for a possible future move to
+> self-hosted bare metal, where "one binary behind nginx behind systemd" is
+> closer to what that would look like again than the k8s manifests are.
+
 # Deploying the API to a droplet
 
 nginx terminates TLS for `api.truelabel.fun` and proxies to the binary on

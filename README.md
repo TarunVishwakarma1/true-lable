@@ -915,11 +915,10 @@ true-lable/
 │   ├── apps/docs/                  # Developer docs (Fumadocs)
 │   ├── apps/dashboard/             # Internal admin dashboard — crash reports, team, resources
 │   └── packages/{ui,eslint-config,typescript-config}/
-├── deploy/                          # Real production deployment (droplet)
-│   ├── nginx-api.truelabel.fun.conf
-│   └── truelabel-backend.service   # systemd unit
-├── .github/                          # Issue/PR templates, CI
-├── k8s/  infra/                     # NOT current production — see Deployment below
+├── deploy/                          # Superseded droplet setup — kept as reference only
+├── .github/                          # Issue/PR templates, CI/CD (builds + deploys to DOKS)
+├── k8s/                              # Kustomize base + overlays — real production deployment
+├── infra/digitalocean/               # Terraform for the DOKS cluster itself
 └── README.md
 ```
 
@@ -934,7 +933,7 @@ true-lable/
 | **OCR** | **On-device Apple Vision** (`DataScannerViewController`, text mode) | No photo ever leaves the device, zero OCR API cost, no image-storage requirement. Confidence comes from server-side `ingredient_overlap_ratio` against reviewed text, not a vendor score. | *Cloud OCR (Google/AWS Vision)* — rejected: recurring cost, requires image upload/storage, adds a network round-trip to every contribution. |
 | **Auth** | **Device bearer token** (+ optional Sign in with Apple) | No password to leak; only `SHA-256(token)` is stored; device id never appears in a URL. | *Full account system* — deferred; Apple Sign-In is implemented server-side but off client-side pending a paid Apple Developer team. |
 | **Backend Framework** | **Rust (Axum + Tokio)** | Memory safety, low resource footprint, strong async ecosystem. | *Actix-web*, *Go/Gin*, *Node.js*. |
-| **Production hosting** | **Single droplet, nginx + systemd** | Simple, cheap, matches actual current traffic. | *Kubernetes (EKS)* — was built out (`k8s/`, `infra/`, `.github/workflows/ci-cd.yml`) but is **not** what's actually running; see [Deployment](#-deployment--infrastructure). |
+| **Production hosting** | **DigitalOcean Kubernetes (DOKS)** | One ingress + one DO Load Balancer routes 4 subdomains to 4 apps; Postgres/Redis are external (Neon/Upstash), so the cluster only ever runs stateless pods. | *Single droplet, nginx + systemd* — simpler, and was live briefly, but doesn't scale past one app/one domain without a proxy config edit per addition; kept as reference in `deploy/`. |
 
 ---
 
@@ -974,24 +973,41 @@ Count < 3   Count ≥ 3
 
 ## 🚀 Deployment & Infrastructure
 
-Production is a **single DigitalOcean droplet** — nginx terminates TLS and
-reverse-proxies to the backend on `127.0.0.1:8080`; systemd
-(`truelabel-backend.service`, sandboxed: `NoNewPrivileges`, `ProtectSystem`,
-a dedicated non-root user) keeps the binary running and restarts it on
-failure. Full details, including the nginx `limit_req`/`limit_conn` zones,
-live in [`deploy/README.md`](deploy/README.md); the two settings that matter
-most for correctness are `SERVER_HOST=127.0.0.1` (never bind the app itself
-to a public interface — nginx is the only thing that should be) and
-`TRUSTED_PROXY_HOPS=1` (so rate limiting reads the real client IP nginx
-forwards, not a spoofable header).
+Production runs on **DigitalOcean Kubernetes (DOKS)**. One ingress
+(ingress-nginx, one DO Load Balancer) routes four hostnames to four
+Deployments; cert-manager keeps all four on Let's Encrypt TLS:
 
-> **⚠️ Known inconsistency:** this repo also contains `k8s/` (Kustomize),
-> `infra/` (Terraform for AWS/DigitalOcean), and
-> `.github/workflows/ci-cd.yml` (which deploys a Docker image to an EKS
-> cluster on push to `main`). None of that is what's actually running —
-> it predates the move to the droplet and hasn't been reconciled yet.
-> Don't treat it as documentation of production; treat it as a TODO to
-> either finish migrating to or delete.
+```
+truelabel.fun            → web        (marketing)
+api.truelabel.fun        → backend
+dashboard.truelabel.fun  → dashboard
+docs.truelabel.fun       → docs
+```
+
+Postgres and Redis are **not** in the cluster — [Neon](https://neon.tech)
+and [Upstash](https://upstash.com) instead, reached over the network like
+any other dependency the app has. The backend only ever reads
+`DATABASE_URL`/`REDIS_URL`, so a future move to self-hosted (bare metal, or
+back in-cluster) is those two values changing, nothing else — the
+excluded-but-not-deleted `k8s/base/postgres/` and `redis/` manifests are
+kept around for exactly that day.
+
+`git push origin main` builds and pushes all four images
+(`.github/workflows/ci-cd.yml`), then deploys via `kubectl apply -k
+k8s/overlays/main`. The full one-time cluster setup (Terraform, DNS,
+cert-manager, GitHub secrets) is in
+[Deployment](https://docs.truelabel.fun/docs/deployment) — worth reading
+before touching any of this by hand.
+
+The setting that matters most for correctness is `TRUSTED_PROXY_HOPS=1`
+(`k8s/base/backend/configmap.yaml`) — ingress-nginx is the only proxy that
+appends to `X-Forwarded-For` here (DO's Load Balancer is L4 and doesn't
+touch HTTP headers), so rate limiting reads the real client IP rather than
+a spoofable header or, worse, one shared bucket for the whole internet.
+
+`deploy/` (droplet + nginx + systemd) briefly *was* production and is kept
+as reference for a possible future bare-metal move, but is superseded —
+see that directory's README for the note.
 
 ---
 

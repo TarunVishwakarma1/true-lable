@@ -1,15 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: web
+  name: docs
   labels:
-    app: web
+    app: docs
 spec:
-  # ClusterIP — see backend/service.yaml's comment; the ingress is the only
-  # public entry point now.
   type: ClusterIP
   selector:
-    app: web
+    app: docs
   ports:
     - name: http
       port: 80

@@ -1,7 +1,11 @@
-# The only overlay CI actually deploys (see .github/workflows/deploy.yml,
-# which runs only on pushes to `main`). It re-pins both image tags to the
-# exact commit SHA just built via `kustomize edit set image` before
-# `kubectl apply -k` — the `latest` below is just the local/manual fallback.
+# The only overlay CI actually deploys (see .github/workflows/ci-cd.yml's
+# `deploy` job, which runs only on pushes to `main`). It re-pins all four
+# image tags to the exact commit SHA just built via `kustomize edit set
+# image` before `kubectl apply -k` — the `latest` below is just the
+# local/manual fallback.
+#
+# The only overlay that includes ingress.yaml: it's the one bound to the
+# real domain, and dev/sit/test share base without it (see base's comment).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -9,11 +13,16 @@ namespace: true-label
 
 resources:
   - ../../base
+  - ingress.yaml
 
 images:
   - name: tarunvishwakarma/true-lable-backend
     newTag: latest
   - name: tarunvishwakarma/true-lable-web
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-dashboard
+    newTag: latest
+  - name: tarunvishwakarma/true-lable-docs
     newTag: latest
 
 patches:

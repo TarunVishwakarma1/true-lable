@@ -1,13 +1,22 @@
-# Not applied by default (see kustomization.yaml) — backend/web are already
-# reachable via their own LoadBalancer Services without any of this. Add
-# this to kustomization.yaml's `resources:` once you have a real domain and
-# an ingress controller (e.g. ingress-nginx) installed in the cluster, and
-# replace the two placeholder hosts below.
+# The one public entry point for all four apps, fronted by a single DO Load
+# Balancer that ingress-nginx's own Service provisions. Requires, cluster-side
+# (one-time, not managed by this kustomization — see docs/deployment.mdx):
+#   - ingress-nginx (the controller these annotations/ingressClassName target)
+#   - cert-manager, plus the ClusterIssuer in
+#     k8s/base/cert-manager/cluster-issuer.yaml (applied standalone, once —
+#     see that file's own header comment for why it's not in any
+#     kustomization's resources list)
+#
+# Both are portable to any k8s cluster (DOKS today, a home bare-metal cluster
+# later) — nothing here is DigitalOcean-specific except the DNS records
+# pointing at whatever address the DO Load Balancer gets, which is the one
+# thing that has to change on a move.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: true-label
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 
@@ -31,18 +40,19 @@ metadata:
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
     nginx.ingress.kubernetes.io/limit-connections: "20"
 
-    # Once this ingress is applied, set TRUSTED_PROXY_HOPS in
-    # backend-config to the number of proxies appending to X-Forwarded-For.
-    # With this ingress and nothing else in front, that is 1.
+    # With this ingress and nothing else in front, TRUSTED_PROXY_HOPS in
+    # backend-config must be 1 — see that file's comment.
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - api.example.com
-        - app.example.com
+        - truelabel.fun
+        - api.truelabel.fun
+        - dashboard.truelabel.fun
+        - docs.truelabel.fun
       secretName: true-label-tls
   rules:
-    - host: api.example.com
+    - host: api.truelabel.fun
       http:
         paths:
           - path: /
@@ -52,7 +62,7 @@ spec:
                 name: backend
                 port:
                   number: 80
-    - host: app.example.com
+    - host: truelabel.fun
       http:
         paths:
           - path: /
@@ -60,5 +70,25 @@ spec:
             backend:
               service:
                 name: web
+                port:
+                  number: 80
+    - host: dashboard.truelabel.fun
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard
+                port:
+                  number: 80
+    - host: docs.truelabel.fun
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: docs
                 port:
                   number: 80

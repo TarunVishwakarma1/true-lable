@@ -1,7 +1,7 @@
 name: CI/CD
 
 # Every push to any of the 4 long-lived branches builds + tests + publishes
-# both images to Docker Hub, and `latest` always moves to whatever branch
+# all four images to Docker Hub, and `latest` always moves to whatever branch
 # just published (regardless of which one). Only `main` goes on to deploy.
 on:
   push:
@@ -10,6 +10,8 @@ on:
 env:
   BACKEND_IMAGE: tarunvishwakarma/true-lable-backend
   WEB_IMAGE: tarunvishwakarma/true-lable-web
+  DASHBOARD_IMAGE: tarunvishwakarma/true-lable-dashboard
+  DOCS_IMAGE: tarunvishwakarma/true-lable-docs
 
 jobs:
   backend:
@@ -78,33 +80,100 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
-  deploy:
-    needs: [backend, web]
-    if: github.ref == 'refs/heads/main'
+  dashboard:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write # required to assume the AWS role below via OIDC
-      contents: read
-    env:
-      AWS_REGION: us-east-1 # must match infra/aws/cluster/variables.tf's `region`
+    outputs:
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
     steps:
       - uses: actions/checkout@v7
 
-      - uses: azure/setup-kubectl@v4
+      - id: meta
+        run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
-      # No stored AWS credentials — this exchanges the run's OIDC token for
-      # short-lived ones via the role infra/aws/cluster/github-oidc.tf
-      # creates, trusted only for `main` runs of this exact repo.
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          file: web/apps/dashboard/Dockerfile
+          push: true
+          # NEXT_PUBLIC_* are inlined into the browser bundle at build time —
+          # not secrets (they ship to every visitor by definition), so they
+          # live here rather than in a k8s Secret. Only `main` gets the real
+          # production hosts; every other branch keeps building against the
+          # `main`-overlay hosts too, since dev/sit/test have no ingress of
+          # their own to point at (see k8s/base/kustomization.yaml's comment)
+          # — reachable only via port-forward regardless of what's baked in.
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.truelabel.fun
+            NEXT_PUBLIC_DOCS_URL=https://docs.truelabel.fun
+          tags: |
+            ${{ env.DASHBOARD_IMAGE }}:${{ github.ref_name }}
+            ${{ env.DASHBOARD_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.DASHBOARD_IMAGE }}:latest
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard
+
+  docs:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: meta
+        run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          file: web/apps/docs/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCS_IMAGE }}:${{ github.ref_name }}
+            ${{ env.DOCS_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.DOCS_IMAGE }}:latest
+          cache-from: type=gha,scope=docs
+          cache-to: type=gha,mode=max,scope=docs
+
+  deploy:
+    needs: [backend, web, dashboard, docs]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Grants access to the `production` environment's secrets
+    # (DIGITALOCEAN_ACCESS_TOKEN, PROD_DATABASE_URL, PROD_REDIS_URL) — real
+    # cluster and database credentials, unlike DOCKERHUB_*, which every
+    # branch's build job needs and stays a plain repo secret. Without this
+    # line, environment-scoped secrets resolve empty even if they exist.
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      # DO has no OIDC federation like AWS IAM — doctl auth is a long-lived
+      # API token stored as a GitHub secret. Scope it as narrowly as the DO
+      # console allows (a Kubernetes-only token, not a full-account one) and
+      # rotate it if this repo or org access ever changes.
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Configure kubeconfig
-        run: aws eks update-kubeconfig --name true-label --region ${{ env.AWS_REGION }}
+        run: doctl kubernetes cluster kubeconfig save true-label
 
       # Real values live only in GitHub secrets — never committed. This
-      # keeps `backend-secrets`/`postgres-secrets` in the cluster in sync
+      # keeps `backend-secrets`/`dashboard-secrets` in the cluster in sync
       # with them on every deploy; kustomization.yaml only references the
       # names (see k8s/base/*/secret.example.yaml for the template).
       - name: Sync secrets
@@ -114,10 +183,8 @@ jobs:
             --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
             --from-literal=REDIS_URL="${{ secrets.PROD_REDIS_URL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
-          kubectl create secret generic postgres-secrets -n true-label \
-            --from-literal=POSTGRES_USER="${{ secrets.PROD_POSTGRES_USER }}" \
-            --from-literal=POSTGRES_PASSWORD="${{ secrets.PROD_POSTGRES_PASSWORD }}" \
-            --from-literal=POSTGRES_DB="${{ secrets.PROD_POSTGRES_DB }}" \
+          kubectl create secret generic dashboard-secrets -n true-label \
+            --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Pin image tags to this build
@@ -125,6 +192,8 @@ jobs:
         run: |
           yq -i '(.images[] | select(.name == "${{ env.BACKEND_IMAGE }}") | .newTag) = "${{ needs.backend.outputs.sha_tag }}"' kustomization.yaml
           yq -i '(.images[] | select(.name == "${{ env.WEB_IMAGE }}") | .newTag) = "${{ needs.web.outputs.sha_tag }}"' kustomization.yaml
+          yq -i '(.images[] | select(.name == "${{ env.DASHBOARD_IMAGE }}") | .newTag) = "${{ needs.dashboard.outputs.sha_tag }}"' kustomization.yaml
+          yq -i '(.images[] | select(.name == "${{ env.DOCS_IMAGE }}") | .newTag) = "${{ needs.docs.outputs.sha_tag }}"' kustomization.yaml
 
       - name: Deploy
         run: kubectl apply -k k8s/overlays/main
@@ -133,3 +202,5 @@ jobs:
         run: |
           kubectl rollout status deployment/backend -n true-label --timeout=180s
           kubectl rollout status deployment/web -n true-label --timeout=180s
+          kubectl rollout status deployment/dashboard -n true-label --timeout=180s
+          kubectl rollout status deployment/docs -n true-label --timeout=180s

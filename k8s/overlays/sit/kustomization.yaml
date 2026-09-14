@@ -11,6 +11,10 @@ images:
     newTag: sit
   - name: tarunvishwakarma/true-lable-web
     newTag: sit
+  - name: tarunvishwakarma/true-lable-dashboard
+    newTag: sit
+  - name: tarunvishwakarma/true-lable-docs
+    newTag: sit
 
 patches:
   - target:
@@ -23,6 +27,20 @@ patches:
   - target:
       kind: Deployment
       name: web
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: dashboard
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: docs
     patch: |
       - op: replace
         path: /spec/replicas

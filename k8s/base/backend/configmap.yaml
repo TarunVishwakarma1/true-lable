@@ -21,10 +21,13 @@ data:
   # Count the hops that append to the header, outermost first:
   #   ingress-nginx only ............... 1
   #   CDN (Cloudflare etc.) + ingress .. 2
-  # An L4 / TCP load balancer does not append and does not count.
-  TRUSTED_PROXY_HOPS: "0"
+  # An L4 / TCP load balancer does not append and does not count — DO's Load
+  # Balancer in front of ingress-nginx is exactly that, so ingress-nginx is
+  # the only hop.
+  TRUSTED_PROXY_HOPS: "1"
 
   # Browser origins permitted to call the API. The iOS client sends no
-  # Origin, so this stays empty until the web app has a real domain. Empty
-  # means no browser may call it, which is the safe default.
-  ALLOWED_ORIGINS: ""
+  # Origin, so it's unaffected either way. Only the dashboard actually calls
+  # this API from a browser — truelabel.fun (marketing) and docs.truelabel.fun
+  # are both static content with no backend calls, so neither is listed here.
+  ALLOWED_ORIGINS: "https://dashboard.truelabel.fun"

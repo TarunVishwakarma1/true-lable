@@ -5,7 +5,11 @@ metadata:
   labels:
     app: backend
 spec:
-  type: LoadBalancer
+  # ClusterIP, not LoadBalancer: the ingress (see ../ingress.yaml) is the one
+  # public entry point for every app, fronted by a single DO Load Balancer
+  # that ingress-nginx's own Service provisions. One LB for four hostnames
+  # instead of one per app.
+  type: ClusterIP
   selector:
     app: backend
   ports:

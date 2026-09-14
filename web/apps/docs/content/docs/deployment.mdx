@@ -1,120 +1,192 @@
 ---
 title: Deployment
-description: The real production deployment — a droplet, nginx, and systemd.
+description: Production runs on DigitalOcean Kubernetes — one cluster, four apps, one ingress.
 ---
 
-`api.truelabel.fun` runs on a single droplet. nginx terminates TLS and
-proxies to the backend binary on `127.0.0.1:8080`, which systemd keeps
-running. No Kubernetes, no container orchestration, in production today.
+`truelabel.fun` runs on DigitalOcean Kubernetes (DOKS). A single ingress,
+backed by one DO Load Balancer, routes four hostnames to four Deployments;
+cert-manager keeps all four on real TLS via Let's Encrypt. Postgres and
+Redis are **not** in the cluster — [Neon](https://neon.tech) and
+[Upstash](https://upstash.com) instead, reached over the network like any
+other dependency.
 
 ```
-firewall (22, 80, 443 only)
-  → nginx (TLS, edge rate-limit caps)
-    → 127.0.0.1:8080 (systemd: truelabel-backend.service)
+DNS (truelabel.fun + 3 subdomains)
+  → DO Load Balancer
+    → ingress-nginx
+        truelabel.fun           → web        (marketing)
+        api.truelabel.fun       → backend
+        dashboard.truelabel.fun → dashboard
+        docs.truelabel.fun      → docs
+              ↓
+      Neon (Postgres) · Upstash (Redis) — external, not in the cluster
 ```
 
-Everything below lives in `deploy/` at the repo root.
-
-## The two settings that matter
-
-Everything else here is convenience. These two are not — get them wrong
-and the rate limiter in [Rate Limiting](/docs/backend/rate-limiting)
-silently stops working.
-
-<Callout type="warn" title="SERVER_HOST=127.0.0.1, not 0.0.0.0">
-  The default binds every interface, which leaves port 8080 answering the
-  open internet beside nginx — without TLS, and without the header nginx
-  adds. A caller reaching it directly writes `X-Forwarded-For` themselves
-  and picks its own rate-limit bucket on every request, at which point the
-  limits mean nothing. A firewall on 8080 is a good second belt, not a
-  substitute — a container or VPN peer added later is already inside it.
+<Callout type="info" title="The droplet this replaced">
+  Earlier versions of this doc described a single droplet running the
+  backend behind nginx + systemd. That's retired — see
+  [`deploy/README.md`](https://github.com/TarunVishwakarma1/true-lable/blob/main/deploy/README.md)
+  at the repo root, kept only as reference for a possible future move to
+  self-hosted bare metal, where that shape is closer to right again than
+  these Kubernetes manifests are.
 </Callout>
 
-<Callout type="warn" title="TRUSTED_PROXY_HOPS=1">
-  Behind a proxy, every request arrives *from the proxy* — left at `0`,
-  the peer address is `127.0.0.1` for everyone and the whole internet
-  shares one rate-limit bucket. The global backstop is 3,000 requests/hour,
-  so the API starts returning `429` to everybody within minutes of real
-  traffic. Count only hops that append to the header: nginx alone is `1`,
-  a CDN in front of it makes `2`. **Setting it higher than the truth is
-  worse than leaving it at zero** — the surplus entries are the caller's
-  own to forge.
-</Callout>
+## One-time cluster setup
 
-The service logs an error at boot if it detects either mistake.
+Needs `doctl`, `terraform`, `kubectl`, and `helm` locally. Run once, not on
+every deploy.
+
+<Steps>
+<Step>
+
+**Authenticate `doctl`** with a DigitalOcean API token (Settings → API →
+Generate New Token in the DO console). Run this yourself in your own
+terminal — it's interactive and the token should never be pasted anywhere
+else:
+
+```bash
+doctl auth init
+```
+
+</Step>
+<Step>
+
+**Provision the cluster.**
+
+```bash
+cd infra/digitalocean/cluster
+cp terraform.tfvars.example terraform.tfvars   # fill in do_token — gitignored, stays local
+terraform init
+terraform apply
+doctl kubernetes cluster kubeconfig save true-label
+kubectl get nodes   # sanity check
+```
+
+`s-2vcpu-4gb` nodes, autoscaling 1–3, region `blr1` by default — see
+`infra/digitalocean/cluster/variables.tf` to change either.
+
+</Step>
+<Step>
+
+**Install ingress-nginx** — the one thing in this cluster that gets a real
+DO Load Balancer:
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+kubectl get svc -n ingress-nginx ingress-nginx-controller -w
+```
+
+Wait for `EXTERNAL-IP` to populate — that's the one address every hostname
+below points at.
+
+</Step>
+<Step>
+
+**Point DNS at it**, at whatever registrar holds `truelabel.fun`:
+
+```
+truelabel.fun           A  <EXTERNAL-IP>
+api.truelabel.fun       A  <EXTERNAL-IP>
+dashboard.truelabel.fun A  <EXTERNAL-IP>
+docs.truelabel.fun      A  <EXTERNAL-IP>
+```
+
+</Step>
+<Step>
+
+**Install cert-manager**, then apply the one-time `ClusterIssuer` (fill in
+a real contact email first — Let's Encrypt only uses it for expiry
+notices):
+
+```bash
+helm repo add jetstack https://charts.jetstack.io
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager --create-namespace --set crds.enabled=true
+
+# edit k8s/base/cert-manager/cluster-issuer.yaml: CHANGE_ME@example.com → your email
+kubectl apply -f k8s/base/cert-manager/cluster-issuer.yaml
+```
+
+This CR is cluster-scoped and applied standalone, once — it isn't part of
+any kustomize overlay (see that file and `k8s/base/kustomization.yaml`'s
+comments for why).
+
+</Step>
+</Steps>
+
+## Secrets — GitHub Actions, never this repo
+
+Everything below is typed into GitHub's own **Settings → Secrets and
+variables → Actions** UI, never into a file this repo tracks. `.gitignore`
+already refuses `.env`, `k8s/**/secret.yaml` (only `*.example.yaml` is
+meant to be committed), and `*.tfvars`.
+
+| Secret | Where it comes from |
+|---|---|
+| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | Docker Hub → Account Settings → Security |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO console → API. Scope it as narrowly as the console allows. |
+| `PROD_DATABASE_URL` | Neon project → Connection string (`postgresql://...neon.tech/truelabel?sslmode=require`) |
+| `PROD_REDIS_URL` | Upstash database → `rediss://...upstash.io:6379` — TLS, matches the `rediss://` scheme the backend's `redis` crate already supports |
+
+CI creates/updates `backend-secrets` and `dashboard-secrets` in the cluster
+from these on every deploy to `main` (see `.github/workflows/ci-cd.yml`'s
+`deploy` job) — see `k8s/base/backend/secret.example.yaml` and
+`k8s/base/dashboard/secret.example.yaml` for the shape, if you ever need to
+create either by hand against the cluster instead.
+
+<Callout type="warn" title="Migrating off Neon/Upstash later">
+  The backend only ever reads `DATABASE_URL`/`REDIS_URL` — nothing in the
+  code or manifests assumes either provider specifically. Moving to
+  self-hosted Postgres/Redis (bare metal, or back in-cluster) later is
+  exactly two secret values changing, nothing else. `k8s/base/postgres/`
+  and `redis/` still have the in-cluster manifests from before this
+  migration, excluded from the kustomization but not deleted, for exactly
+  that day.
+</Callout>
 
 ## Deploying
 
 ```bash
-# Build for the droplet (Debian/Ubuntu, x86_64)
-cargo build --release --target x86_64-unknown-linux-gnu
+git push origin main
 ```
+
+`.github/workflows/ci-cd.yml` builds and pushes all four images, then (only
+on `main`) authenticates `doctl`, syncs secrets, pins every image to this
+commit's SHA, and runs `kubectl apply -k k8s/overlays/main`.
+
+## Verifying it worked
 
 ```bash
-# On the droplet
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin truelabel
-sudo install -m 0755 truelabel-backend /usr/local/bin/
-sudo install -d -m 0750 -o root -g truelabel /etc/truelabel
-sudo install -m 0640 -o root -g truelabel backend.env /etc/truelabel/backend.env
-sudo install -m 0644 truelabel-backend.service /etc/systemd/system/
+curl -sI https://api.truelabel.fun/health
+curl -sI https://truelabel.fun
+curl -sI https://dashboard.truelabel.fun
+curl -sI https://docs.truelabel.fun
 
-sudo cp nginx-api.truelabel.fun.conf /etc/nginx/sites-available/api.truelabel.fun
-sudo ln -s /etc/nginx/sites-available/api.truelabel.fun /etc/nginx/sites-enabled/
-# add the two limit_req_zone/limit_conn_zone lines to the http{} block first, then:
-sudo nginx -t && sudo systemctl reload nginx
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now truelabel-backend
+# TLS actually issued — READY should read True for all four hosts
+kubectl get certificate -n true-label
 ```
 
-Migrations run automatically at boot, so the database role needs `CREATE`
-rights and must be able to `CREATE EXTENSION pg_trgm` the first time.
+## The one setting that matters here
 
-`truelabel-backend.service` is heavily hardened: `ProtectSystem=strict`,
-an emptied capability-bounding-set, syscall filtering. `nginx-*.conf`
-deliberately does **not** duplicate security headers — the app already
-sets them on every response (see [Rate Limiting](/docs/backend/rate-limiting)
-and [Authentication](/docs/backend/authentication)) — but does add
-`limit_req`/`limit_conn` zones as a first line of defense that costs
-nothing and never reaches the app.
-
-## Checking it worked
-
-```bash
-# Loopback only: the first answers, the second must time out.
-curl -s localhost:8080/health
-curl -s --max-time 5 http://<droplet-ip>:8080/health
-
-# Through nginx, with the headers the app sets.
-curl -sI https://api.truelabel.fun/health | grep -Ei 'cache-control|strict-transport|x-frame'
-
-# Real client addresses are reaching the app.
-journalctl -u truelabel-backend -f | grep -i 'rate limit'
-```
-
-If a rate-limit warning ever names `127.0.0.1` as the subject, the hop
-count is wrong and every user is sharing one bucket.
-
-## Postgres and Redis
-
-Both listen on loopback only — `listen_addresses = 'localhost'` and
-`bind 127.0.0.1`. They hold every profile and every device-token hash, and
-neither speaks TLS in this setup, so nothing but the API should be able to
-open a socket to them.
-
-## `k8s/` and `infra/` — not the current deployment
-
-The repo also has Kubernetes manifests (`k8s/`, Kustomize base + overlays)
-and Terraform for AWS/DigitalOcean (`infra/`), plus a GitHub Actions
-workflow (`.github/workflows/ci-cd.yml`) that builds, pushes, and deploys
-Docker images to an EKS cluster on push to `main`.
-
-<Callout type="warn" title="This does not match production">
-  That workflow targets an EKS cluster; the droplet above is what's
-  actually live at `api.truelabel.fun`. Treat `k8s/`/`infra/` as
-  experimental multi-cloud scaffolding, not the deployment path currently
-  in use — and don't assume the CI workflow's deploy step reflects reality
-  until it's updated to target the droplet (or the droplet is retired in
-  favor of the cluster). If you're picking this up, that inconsistency is
-  the first thing worth resolving one way or the other.
+<Callout type="warn" title="TRUSTED_PROXY_HOPS=1">
+  Set in `k8s/base/backend/configmap.yaml`. ingress-nginx is the only proxy
+  that appends to `X-Forwarded-For` in this setup — DO's Load Balancer is
+  L4 and doesn't touch HTTP headers — so `1` is correct as long as nothing
+  else sits between it and the app. Get this wrong and the rate limiter in
+  [Rate Limiting](/docs/backend/rate-limiting) either silently stops
+  meaning anything (too high) or throttles every user as one shared bucket
+  (should be higher than it is). The service logs an error at boot if it
+  detects either mistake.
 </Callout>
+
+## dev / sit / test overlays
+
+`k8s/overlays/{dev,sit,test}` exist for local or manual multi-env parity —
+own namespace, smaller replica counts — but only `main` is wired into CI's
+`deploy` job, and only `main` includes the ingress (see
+`k8s/base/kustomization.yaml`'s comment on why the others don't: an
+Ingress claiming `api.truelabel.fun` etc. from three namespaces at once
+would fight itself). Reach the others via `kubectl port-forward` instead
+of a hostname.

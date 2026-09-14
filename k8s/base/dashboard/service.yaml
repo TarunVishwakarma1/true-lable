@@ -1,15 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: web
+  name: dashboard
   labels:
-    app: web
+    app: dashboard
 spec:
-  # ClusterIP — see backend/service.yaml's comment; the ingress is the only
-  # public entry point now.
   type: ClusterIP
   selector:
-    app: web
+    app: dashboard
   ports:
     - name: http
       port: 80

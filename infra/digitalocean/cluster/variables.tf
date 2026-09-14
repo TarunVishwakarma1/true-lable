@@ -5,8 +5,9 @@ variable "do_token" {
 }
 
 variable "region" {
-  type    = string
-  default = "nyc1"
+  type        = string
+  default     = "blr1"
+  description = "blr1 (Bangalore) by default — change if you're not operating from India. `doctl kubernetes options regions` lists all of them."
 }
 
 variable "cluster_name" {
@@ -16,8 +17,8 @@ variable "cluster_name" {
 
 variable "cluster_version_prefix" {
   type        = string
-  default     = "1.31"
-  description = "DOKS retires exact patch versions over time — this resolves to whatever patch DO currently supports for this minor version (see main.tf), instead of hardcoding one that goes stale."
+  default     = "1.36"
+  description = "DOKS retires exact patch versions over time — this resolves to whatever patch DO currently supports for this minor version (see main.tf), instead of hardcoding one that goes stale. Current options: `doctl kubernetes options versions`."
 }
 
 variable "node_size" {
