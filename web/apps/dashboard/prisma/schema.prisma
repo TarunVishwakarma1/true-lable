@@ -1,0 +1,16 @@
+// This dashboard reads/writes the same Postgres database as the Rust
+// backend. The backend's sqlx migrations (backend/migrations/) stay the
+// only source of schema truth — this file is a typed client on top of
+// that schema, not a second migration authority. Once the backend adds
+// the crash-report / admin-user tables, run `bunx prisma db pull` here to
+// introspect them into this schema, then `bunx prisma generate`. Do not
+// run `prisma migrate` against the shared database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

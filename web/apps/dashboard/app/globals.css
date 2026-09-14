@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "@repo/ui/styles.css";
+@source "../../../packages/ui/src";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Geist isn't wired up yet — this app has no UI to speak of. Swap in
+   next/font/local the way apps/web and apps/docs do once real screens
+   get built. */
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", monospace;
+}
+
+html {
+  height: 100%;
+}
+body {
+  min-height: 100%;
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
