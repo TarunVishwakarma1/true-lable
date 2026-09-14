@@ -48,6 +48,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -85,6 +87,8 @@ jobs:
       sha_tag: ${{ steps.meta.outputs.sha_tag }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - id: meta
         run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
@@ -114,6 +118,8 @@ jobs:
       sha_tag: ${{ steps.meta.outputs.sha_tag }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - id: meta
         run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
@@ -153,6 +159,8 @@ jobs:
       sha_tag: ${{ steps.meta.outputs.sha_tag }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - id: meta
         run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
@@ -188,6 +196,8 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
 
       # DO has no OIDC federation like AWS IAM — doctl auth is a long-lived
       # API token stored as a GitHub secret. Scope it as narrowly as the DO

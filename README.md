@@ -43,6 +43,15 @@ Each app is independent — you don't need all three running to work on one.
 For the full walkthrough with more detail, see the
 [Getting Started](web/apps/docs/content/docs/getting-started.mdx) doc.
 
+> **`backend/` and `ios/truelable/` are git submodules** — a plain
+> `git clone` leaves both empty. Use
+> `git clone --recurse-submodules <this-repo>`, or after a plain clone,
+> `git submodule update --init --recursive`. Changing code in either means
+> committing in that submodule's own repo
+> ([true-label-backend](https://github.com/TarunVishwakarma1/true-label-backend),
+> [true-label-ios](https://github.com/TarunVishwakarma1/true-label-ios))
+> first, then committing the updated pointer here.
+
 ### Prerequisites
 
 - **Backend**: Rust stable (`rustup default stable`), Docker (or native Postgres 17 + Redis 7)
@@ -873,7 +882,7 @@ clobbering an existing row.
 
 ```markdown
 true-lable/
-├── backend/                        # Rust backend (Axum + Tokio)
+├── backend/                        # Rust backend (Axum + Tokio) — git submodule, own repo
 │   ├── Cargo.toml
 │   ├── .env.example
 │   ├── migrations/                 # SQLx migrations, run automatically at boot
@@ -901,7 +910,8 @@ true-lable/
 │       │   ├── crash_report_service.rs
 │       │   └── github_service.rs   # "Publish to GitHub" issue creation
 │       └── models/{product,ocr,user,verification,response,admin,crash_report}.rs
-├── ios/truelable/truelable/        # iOS app (SwiftUI, iOS 26+)
+├── ios/truelable/                  # iOS app (SwiftUI, iOS 26+) — git submodule, own repo
+│   └── truelable/
 │   ├── App/                        # TrueLabelApp, RootView, AppRouter
 │   ├── Core/                       # APIClient, DeviceAuth, Account, Preferences, Plus, CrashReporter
 │   ├── Design/                     # Theme.swift (enum TL), Components.swift
