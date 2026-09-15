@@ -219,13 +219,14 @@ jobs:
     runs-on: ubuntu-latest
     # Grants access to the `production` environment's secrets
     # (DIGITALOCEAN_ACCESS_TOKEN, PROD_DATABASE_URL, PROD_REDIS_URL,
-    # PROD_GITHUB_TOKEN, PROD_GITHUB_WEBHOOK_SECRET) — real cluster/
-    # database/API credentials, unlike DOCKERHUB_*, which every branch's
-    # build job needs and stays a plain repo secret. Without this line,
-    # environment-scoped secrets resolve empty even if they exist. Both
-    # PROD_GITHUB_TOKEN and PROD_GITHUB_WEBHOOK_SECRET are optional — omit
-    # either and the corresponding GitHub-sync feature just fails with a
-    # clear error; nothing else depends on them.
+    # PROD_GITHUB_TOKEN, PROD_GITHUB_WEBHOOK_SECRET, PROD_GOOGLE_OAUTH_CLIENT_ID)
+    # — real cluster/database/API credentials, unlike DOCKERHUB_*, which
+    # every branch's build job needs and stays a plain repo secret. Without
+    # this line, environment-scoped secrets resolve empty even if they
+    # exist. PROD_GITHUB_TOKEN, PROD_GITHUB_WEBHOOK_SECRET, and
+    # PROD_GOOGLE_OAUTH_CLIENT_ID are all optional — omit any of them and
+    # the corresponding feature just fails with a clear error; nothing else
+    # depends on them.
     environment: production
     steps:
       - uses: actions/checkout@v7
@@ -255,6 +256,7 @@ jobs:
             --from-literal=REDIS_URL="${{ secrets.PROD_REDIS_URL }}" \
             --from-literal=GITHUB_TOKEN="${{ secrets.PROD_GITHUB_TOKEN }}" \
             --from-literal=GITHUB_WEBHOOK_SECRET="${{ secrets.PROD_GITHUB_WEBHOOK_SECRET }}" \
+            --from-literal=GOOGLE_OAUTH_CLIENT_ID="${{ secrets.PROD_GOOGLE_OAUTH_CLIENT_ID }}" \
             --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret generic dashboard-secrets -n true-label \
             --from-literal=DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \

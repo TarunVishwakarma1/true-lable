@@ -131,6 +131,7 @@ meant to be committed), and `*.tfvars`.
 | `PROD_REDIS_URL` | Upstash database → `rediss://...upstash.io:6379` — TLS, matches the `rediss://` scheme the backend's `redis` crate already supports |
 | `PROD_GITHUB_TOKEN` | Optional. GitHub → Settings → Developer settings → a fine-grained PAT scoped to `Issues: write` on this repo. Powers the dashboard's "publish as GitHub issue" button only — omit it and everything else still works, that one button just fails with a clear error. |
 | `PROD_GITHUB_WEBHOOK_SECRET` | Optional. A random secret you generate (`openssl rand -hex 32`) and set on both sides: here, and on the repo's own webhook (Settings → Webhooks → Add webhook → Payload URL `https://api.truelabel.fun/api/v1/webhooks/github`, content type `application/json`, same secret, subscribed to **Issues** only). Lets closing/reopening an issue directly on GitHub sync back onto the linked crash report's status. Omit it and that one endpoint just refuses every delivery with a clear error. |
+| `PROD_GOOGLE_OAUTH_CLIENT_ID` | Optional. The **Web application** OAuth client ID from Google Cloud Console (not the separate Android-type client, which has no secret and is never sent here) — the JWT audience the backend validates a Google ID token's `aud` claim against. Powers the Android app's "Sign in with Google" only. Omit it and `POST /api/v1/me/link/google` just refuses every request with a clear error. |
 
 CI creates/updates `backend-secrets` and `dashboard-secrets` in the cluster
 from these on every deploy to `main` (see `.github/workflows/ci-cd.yml`'s

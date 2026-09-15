@@ -178,6 +178,30 @@ Migrations run automatically at boot, so the Neon role the connection
 string authenticates as needs `CREATE` rights and must be able to
 `CREATE EXTENSION pg_trgm` the first time.
 
+## Registering the GitHub webhook (optional)
+
+Only needed if `GITHUB_WEBHOOK_SECRET` is set in `backend.env` — skip this
+if it's commented out. This step is entirely on GitHub's side; the backend
+already has the endpoint (`POST /api/v1/webhooks/github`) and refuses
+cleanly if the secret's absent, so nothing breaks by skipping it.
+
+```bash
+openssl rand -hex 32   # this becomes GITHUB_WEBHOOK_SECRET on the VM
+```
+
+Put that value in `backend.env` (see above), redeploy/restart the service
+so it picks it up, then on GitHub: repo **Settings → Webhooks → Add
+webhook** — Payload URL `https://api.truelabel.fun/api/v1/webhooks/github`,
+content type `application/json`, secret = the same value, subscribed to
+**Issues** only (not "send everything," which would also fire `ping` and
+every other event type this endpoint doesn't care about). GitHub sends a
+`ping` delivery immediately on save — the endpoint checks the HMAC
+signature first (so the secret still has to match), then sees this isn't
+an `issues` event and answers `200` with no further parsing. Check
+**Recent Deliveries** on the webhook's page to confirm it landed as a
+green check, not a red X. Closing or reopening an issue linked to a crash
+report should then sync its status back within seconds.
+
 ## The two settings that matter
 
 Everything else here is convenience. These two are not.
