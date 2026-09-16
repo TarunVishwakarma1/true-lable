@@ -32,7 +32,7 @@ const csp = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  ...(process.env.DOCKER_BUILD && { output: "standalone" }),
   async headers() {
     return [
       {
