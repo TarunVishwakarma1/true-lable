@@ -18,20 +18,17 @@ const MODEL_PATH = "/3d/iphone_air.glb";
 function GLTFPhoneModel({
   imageSrc,
   interactive = true,
+  dragState,
 }: {
   imageSrc: string;
   interactive?: boolean;
+  dragState: React.MutableRefObject<{
+    isDragging: boolean;
+    rotX: number;
+    rotY: number;
+  }>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const dragRef = useRef({
-    isDragging: false,
-    prevX: 0,
-    prevY: 0,
-    rotX: 0,
-    rotY: 0,
-    velX: 0,
-    velY: 0,
-  });
 
   // Load screenshot texture
   const texture = useLoader(THREE.TextureLoader, imageSrc);
@@ -134,73 +131,32 @@ function GLTFPhoneModel({
     });
   }, [clonedScene, texture]);
 
-  // Physics loop for floating & damped rotation
+  // Physics loop: Only snap back when drag is released
   useFrame((state) => {
     if (!groupRef.current) return;
 
-    const drag = dragRef.current;
-    const t = state.clock.getElapsedTime();
-
-    // Subtle breathing floating physics
-    const hoverY = Math.sin(t * 1.6) * 0.06;
-    const hoverRoll = Math.sin(t * 1.2) * 0.015;
+    const drag = dragState.current;
 
     if (!drag.isDragging) {
-      // Subtle cursor hover parallax tracking
-      const factor = interactive ? 1.0 : 0.6;
-      const targetPointerY = state.pointer.x * (0.35 * factor);
-      const targetPointerX = -state.pointer.y * (0.24 * factor);
+      // Subtle cursor hover parallax tracking when not dragging
+      const factor = interactive ? 1.0 : 0.5;
+      const targetPointerY = state.pointer.x * (0.16 * factor);
+      const targetPointerX = -state.pointer.y * (0.06 * factor);
 
-      // Friction damping on rotational momentum
-      drag.velX *= 0.92;
-      drag.velY *= 0.92;
-      drag.rotX += drag.velX;
-      drag.rotY += drag.velY;
-
-      // Elastic snap-back towards pointer position
-      drag.rotX = THREE.MathUtils.lerp(drag.rotX, targetPointerX, 0.06);
-      drag.rotY = THREE.MathUtils.lerp(drag.rotY, targetPointerY, 0.06);
+      // Smooth spring return to upright facing position
+      drag.rotX = THREE.MathUtils.lerp(drag.rotX, targetPointerX, 0.08);
+      drag.rotY = THREE.MathUtils.lerp(drag.rotY, targetPointerY, 0.08);
     }
 
-    // Apply combined rotations
+    // Apply rotations directly without vertical bobbing/floating
     groupRef.current.rotation.x = drag.rotX;
     groupRef.current.rotation.y = drag.rotY;
-    groupRef.current.rotation.z = hoverRoll;
-    groupRef.current.position.y = hoverY;
+    groupRef.current.rotation.z = 0;
+    groupRef.current.position.y = 0;
   });
 
   return (
-    <group
-      ref={groupRef}
-      onPointerDown={(e) => {
-        if (!interactive) return;
-        e.stopPropagation();
-        dragRef.current.isDragging = true;
-        dragRef.current.prevX = e.clientX;
-        dragRef.current.prevY = e.clientY;
-      }}
-      onPointerMove={(e) => {
-        if (!interactive || !dragRef.current.isDragging) return;
-        const dx = e.clientX - dragRef.current.prevX;
-        const dy = e.clientY - dragRef.current.prevY;
-        dragRef.current.prevX = e.clientX;
-        dragRef.current.prevY = e.clientY;
-
-        const sensitivity = 0.006;
-        dragRef.current.rotY += dx * sensitivity;
-        dragRef.current.rotX += dy * sensitivity;
-        dragRef.current.velY = dx * sensitivity;
-        dragRef.current.velX = dy * sensitivity;
-      }}
-      onPointerUp={() => {
-        if (!interactive) return;
-        dragRef.current.isDragging = false;
-      }}
-      onPointerOut={() => {
-        if (!interactive) return;
-        dragRef.current.isDragging = false;
-      }}
-    >
+    <group ref={groupRef}>
       {/* Centered & Orientated GLB Model */}
       <group
         rotation={[0, -Math.PI / 2, 0]}
@@ -262,6 +218,13 @@ export function IPhone3D({
   showHint = true,
 }: IPhone3DProps) {
   const [mounted, setMounted] = useState(false);
+  const dragState = useRef({
+    isDragging: false,
+    prevX: 0,
+    prevY: 0,
+    rotX: 0,
+    rotY: 0,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -273,9 +236,48 @@ export function IPhone3D({
 
   return (
     <div
-      className={`relative ${className} select-none ${
+      className={`relative ${className} select-none touch-none ${
         interactive ? "cursor-grab active:cursor-grabbing" : ""
       }`}
+      onPointerDown={(e) => {
+        if (!interactive) return;
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        dragState.current.isDragging = true;
+        dragState.current.prevX = e.clientX;
+        dragState.current.prevY = e.clientY;
+      }}
+      onPointerMove={(e) => {
+        if (!interactive || !dragState.current.isDragging) return;
+        const dx = e.clientX - dragState.current.prevX;
+        const dy = e.clientY - dragState.current.prevY;
+        dragState.current.prevX = e.clientX;
+        dragState.current.prevY = e.clientY;
+
+        // Smooth Y rotation up to 300+ degrees to see the back of the phone
+        const sensitivityY = 0.008;
+        const sensitivityX = 0.0015;
+
+        // Clamped to ~300 degrees (+/- 5.24 radians)
+        dragState.current.rotY = Math.max(
+          -5.24,
+          Math.min(5.24, dragState.current.rotY + dx * sensitivityY)
+        );
+        // Subtle micro-tilt on X axis (+/- 8 degrees)
+        dragState.current.rotX = Math.max(
+          -0.14,
+          Math.min(0.14, dragState.current.rotX + dy * sensitivityX)
+        );
+      }}
+      onPointerUp={(e) => {
+        if (!interactive) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+        dragState.current.isDragging = false;
+      }}
+      onPointerCancel={(e) => {
+        if (!interactive) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+        dragState.current.isDragging = false;
+      }}
     >
       {/* Subtle Hint Badge (only for interactive 3D hero) */}
       {showHint && interactive && (
@@ -294,7 +296,7 @@ export function IPhone3D({
         camera={{ position: [0, 0, 7.5], fov: 42 }}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        className="h-full w-full"
+        className="h-full w-full pointer-events-none"
       >
         {/* Studio Lighting */}
         <ambientLight intensity={1.4} />
@@ -304,11 +306,16 @@ export function IPhone3D({
         <directionalLight position={[-4, -3, 4]} intensity={1.6} color="#e4e4e7" />
         {/* Emerald Rim Highlight */}
         <directionalLight position={[0, 6, -4]} intensity={2.0} color="#10b981" />
-        {/* Azure Back Rim */}
-        <directionalLight position={[0, -5, -6]} intensity={1.5} color="#60a5fa" />
+        {/* Azure Back Rim for seeing camera & backplate clearly */}
+        <directionalLight position={[0, -5, -6]} intensity={2.2} color="#60a5fa" />
+        <directionalLight position={[3, 4, -5]} intensity={2.0} color="#ffffff" />
 
         <Suspense fallback={null}>
-          <GLTFPhoneModel imageSrc={imageSrc} interactive={interactive} />
+          <GLTFPhoneModel
+            imageSrc={imageSrc}
+            interactive={interactive}
+            dragState={dragState}
+          />
         </Suspense>
       </Canvas>
     </div>

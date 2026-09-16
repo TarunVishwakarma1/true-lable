@@ -4,6 +4,10 @@
 
 TrueLabel empowers consumers to scan barcodes, instantly retrieve accurate food and nutrition facts, and crowdsource missing or unverified food labels using on-device OCR and peer verification.
 
+<p align="center">
+  <img src="assets/app-preview.png" alt="TrueLabel Native App & 3D Interactive Preview" width="100%" />
+</p>
+
 > **📚 Full developer documentation, with search:** the details below get you
 > running locally; anything deeper — the complete API reference, the iOS
 > app's architecture, deployment internals — lives at
