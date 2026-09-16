@@ -24,7 +24,7 @@ const nextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "avatars.githubusercontent.com" }],
   },
-  allowedDevOrigins: ['192.168.0.103'],
+  allowedDevOrigins: ['192.168.0.103', '172.20.10.4'],
   async headers() {
     return [
       {
