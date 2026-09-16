@@ -24,7 +24,7 @@ const csp = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: "standalone",
+  ...(process.env.DOCKER_BUILD && { output: "standalone" }),
   async headers() {
     return [
       {
