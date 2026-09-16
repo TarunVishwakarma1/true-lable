@@ -20,7 +20,7 @@ const csp = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(process.env.DOCKER_BUILD && { output: "standalone" }),
+  ...(!process.env.VERCEL && { output: "standalone" }),
   images: {
     remotePatterns: [{ protocol: "https", hostname: "avatars.githubusercontent.com" }],
   },
