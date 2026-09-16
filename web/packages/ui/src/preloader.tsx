@@ -9,19 +9,30 @@ export function Preloader() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("tl_preloaded")) {
+      setDone(true);
+      setCount(100);
+      return;
+    }
+
     document.body.style.overflow = "hidden";
     const start = performance.now();
-    const duration = 1300;
+    const duration = 1200;
     let frame = 0;
     function tick(now: number) {
       const p = Math.min((now - start) / duration, 1);
       setCount(Math.round((1 - Math.pow(1 - p, 3)) * 100));
-      if (p < 1) frame = requestAnimationFrame(tick);
-      else
+      if (p < 1) {
+        frame = requestAnimationFrame(tick);
+      } else {
         setTimeout(() => {
           setDone(true);
+          try {
+            sessionStorage.setItem("tl_preloaded", "1");
+          } catch {}
           document.body.style.overflow = "";
-        }, 220);
+        }, 200);
+      }
     }
     frame = requestAnimationFrame(tick);
     return () => {

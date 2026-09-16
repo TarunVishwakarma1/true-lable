@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { Container } from "@repo/ui/container";
 import { SoundToggle } from "@repo/ui/sound";
@@ -41,7 +42,7 @@ export function Nav() {
         }`}
       >
         <Container className="flex h-16 items-center justify-between">
-          <a href="#top" aria-label="TrueLabel home" className="block h-9 w-9 shrink-0">
+          <Link href="/" aria-label="TrueLabel home" className="block h-9 w-9 shrink-0">
             <Image
               src="/brand/logo-light.png"
               alt="TrueLabel"
@@ -58,13 +59,13 @@ export function Nav() {
               priority
               className="hidden h-9 w-9 rounded-md dark:block"
             />
-          </a>
+          </Link>
 
           <nav aria-label="Primary" className="hidden items-center gap-8 text-sm md:flex">
             {NAV.map((item) => (
-              <a key={item.href} href={item.href} className="text-muted transition-colors hover:text-fg">
+              <Link key={item.href} href={item.href} className="text-muted transition-colors hover:text-fg">
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -120,14 +121,14 @@ export function Nav() {
                   transition={{ delay: 0.08 + i * 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   className="border-b border-line"
                 >
-                  <a
+                  <Link
                     href={item.href}
                     onClick={() => setMenu(false)}
                     className="flex items-baseline justify-between py-5 text-3xl font-medium tracking-tight"
                   >
                     {item.label}
                     <span className="font-mono text-xs text-muted">0{i + 1}</span>
-                  </a>
+                  </Link>
                 </motion.li>
               ))}
             </ul>
