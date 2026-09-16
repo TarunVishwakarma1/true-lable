@@ -155,9 +155,13 @@ uninterrupted. That's also why the real config below already has that exact
 Now the real config, which has valid cert paths to reference:
 
 ```bash
+# Define the rate and connection limit zones inside the http context:
+cat <<'EOF' | sudo tee /etc/nginx/conf.d/limits.conf
+limit_req_zone  $binary_remote_addr zone=api:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=perip:10m;
+EOF
+
 sudo cp nginx-api.truelabel.fun.conf /etc/nginx/sites-available/api.truelabel.fun
-# add the two limit zones (limit_req_zone/limit_conn_zone — see the file's
-# own header comment) to the http{} block in /etc/nginx/nginx.conf first
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
