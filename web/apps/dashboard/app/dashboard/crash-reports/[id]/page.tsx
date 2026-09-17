@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, Copy, ExternalLink, Github, Loader2 } from "lucide-react";
-import { STATUS_LABEL, PlatformBadge } from "../../../components/badges";
+import { STATUS_LABEL, PlatformBadge, SeverityBadge, StatusBadge } from "../../../components/badges";
 import { Skeleton } from "../../../components/skeleton";
 import { ApiError, api, type CrashReport, type ReportStatus, type Severity } from "../../../../lib/api";
 import { useAuth } from "../../../../lib/auth-context";
@@ -15,6 +15,7 @@ const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 export default function CrashReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { token, profile } = useAuth();
+  const canEdit = profile?.role === "admin" || profile?.role === "member";
   const [report, setReport] = useState<CrashReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export default function CrashReportDetailPage() {
   }, [token, id]);
 
   async function updateField(patch: { status?: ReportStatus; severity?: Severity }, field: "status" | "severity") {
-    if (!token) return;
+    if (!token || !canEdit) return;
     setUpdatingField(field);
     setError(null);
     try {
@@ -209,43 +210,51 @@ export default function CrashReportDetailPage() {
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">Diagnostics State</h2>
             <div className="divide-y divide-line">
               <Property label="Status">
-                <div className="relative flex items-center">
-                  <select
-                    value={report.status}
-                    disabled={updatingField !== null}
-                    onChange={(e) => updateField({ status: e.target.value as ReportStatus }, "status")}
-                    className="h-7 rounded-md border border-line bg-surface pr-6 pl-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-50"
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                  {updatingField === "status" && (
-                    <Loader2 size={11} className="pointer-events-none absolute right-1.5 animate-spin text-muted" />
-                  )}
-                </div>
+                {canEdit ? (
+                  <div className="relative flex items-center">
+                    <select
+                      value={report.status}
+                      disabled={updatingField !== null}
+                      onChange={(e) => updateField({ status: e.target.value as ReportStatus }, "status")}
+                      className="h-7 rounded-md border border-line bg-surface pr-6 pl-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-50"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABEL[s]}
+                        </option>
+                      ))}
+                    </select>
+                    {updatingField === "status" && (
+                      <Loader2 size={11} className="pointer-events-none absolute right-1.5 animate-spin text-muted" />
+                    )}
+                  </div>
+                ) : (
+                  <StatusBadge status={report.status} />
+                )}
               </Property>
 
               <Property label="Severity">
-                <div className="relative flex items-center">
-                  <select
-                    value={report.severity}
-                    disabled={updatingField !== null}
-                    onChange={(e) => updateField({ severity: e.target.value as Severity }, "severity")}
-                    className="h-7 rounded-md border border-line bg-surface pr-6 pl-2 text-xs capitalize text-fg outline-none focus:border-accent disabled:opacity-50"
-                  >
-                    {SEVERITIES.map((s) => (
-                      <option key={s} value={s} className="capitalize">
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  {updatingField === "severity" && (
-                    <Loader2 size={11} className="pointer-events-none absolute right-1.5 animate-spin text-muted" />
-                  )}
-                </div>
+                {canEdit ? (
+                  <div className="relative flex items-center">
+                    <select
+                      value={report.severity}
+                      disabled={updatingField !== null}
+                      onChange={(e) => updateField({ severity: e.target.value as Severity }, "severity")}
+                      className="h-7 rounded-md border border-line bg-surface pr-6 pl-2 text-xs capitalize text-fg outline-none focus:border-accent disabled:opacity-50"
+                    >
+                      {SEVERITIES.map((s) => (
+                        <option key={s} value={s} className="capitalize">
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    {updatingField === "severity" && (
+                      <Loader2 size={11} className="pointer-events-none absolute right-1.5 animate-spin text-muted" />
+                    )}
+                  </div>
+                ) : (
+                  <SeverityBadge severity={report.severity} />
+                )}
               </Property>
 
               <Property label="Platform">

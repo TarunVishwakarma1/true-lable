@@ -62,14 +62,30 @@ export function Nav() {
           </Link>
 
           <nav aria-label="Primary" className="hidden items-center gap-8 text-sm md:flex">
-            {NAV.map((item) => (
-              <Link key={item.href} href={item.href} className="text-muted transition-colors hover:text-fg">
-                {item.label}
-              </Link>
-            ))}
+            {NAV.map((item) => {
+              const isExternal = item.href.startsWith("http");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
+                  className="text-muted transition-colors hover:text-fg"
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-5">
+            <a
+              href="https://dashboard.truelabel.fun"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden items-center gap-1.5 rounded-full border border-line bg-fg/[0.04] px-3 py-1 text-xs font-medium text-fg transition-colors hover:bg-fg/[0.08] sm:inline-flex"
+            >
+              Dashboard
+            </a>
             <a
               href={REPO_URL}
               target="_blank"

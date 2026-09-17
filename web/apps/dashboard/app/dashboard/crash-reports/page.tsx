@@ -26,7 +26,7 @@ const PLATFORMS: Platform[] = ["ios", "backend", "web"];
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 
 export default function CrashReportsPage() {
-  const { token } = useAuth();
+  const { token, profile } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<CrashReport[]>([]);
   const [total, setTotal] = useState(0);
@@ -41,6 +41,7 @@ export default function CrashReportsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isSearching = q !== debouncedQ;
+  const canCreate = profile?.role === "admin" || profile?.role === "member";
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -105,13 +106,15 @@ export default function CrashReportsPage() {
             {total} total reports across clients and backend services
           </p>
         </div>
-        <Link
-          href="/dashboard/crash-reports/new"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg transition-all hover:opacity-90 shadow-xs"
-        >
-          <Plus size={13} />
-          <span>New report</span>
-        </Link>
+        {canCreate && (
+          <Link
+            href="/dashboard/crash-reports/new"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg transition-all hover:opacity-90 shadow-xs"
+          >
+            <Plus size={13} />
+            <span>New report</span>
+          </Link>
+        )}
       </div>
 
       {/* Status KPI Metric Cards */}

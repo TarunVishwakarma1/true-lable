@@ -42,6 +42,14 @@ function ago(iso?: string) {
 const COLUMNS = [
   { heading: "Product", links: NAV },
   {
+    heading: "Platform",
+    links: [
+      { label: "Dashboard", href: "https://dashboard.truelabel.fun" },
+      { label: "Register account", href: "https://dashboard.truelabel.fun/register" },
+      { label: "Documentation", href: "https://docs.truelabel.fun" },
+    ],
+  },
+  {
     heading: "Community",
     links: [
       { label: "GitHub", href: REPO_URL },

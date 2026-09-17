@@ -1,6 +1,8 @@
 export const REPO = "TarunVishwakarma1/true-lable";
 export const REPO_URL = `https://github.com/${REPO}`;
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+export const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.truelabel.fun";
+export const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "https://dashboard.truelabel.fun";
 
 export const NAV = [
   { label: "The problem", href: "/#problem" },
@@ -8,6 +10,7 @@ export const NAV = [
   { label: "Free & Premium", href: "/#features" },
   { label: "Built in the open", href: "/#community" },
   { label: "App Preview", href: "/preview" },
+  { label: "Docs", href: DOCS_URL },
 ];
 
 export const SHELF = [

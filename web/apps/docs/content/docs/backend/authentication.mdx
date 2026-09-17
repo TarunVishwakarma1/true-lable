@@ -117,18 +117,16 @@ trade for an admin surface. The lookup itself is one indexed row read
 <Callout type="info" title="The first account is the admin">
   Registration checks `SELECT COUNT(*) FROM dashboard_users` first — zero
   rows means this is the first account and it gets `role = 'admin'`
-  automatically; every account after that starts as `member`. That is what
-  makes "I'll be the admin" true without a manual database edit.
+  automatically. That is what makes "I'll be the admin" true without a manual database edit.
 </Callout>
 
-<Callout type="info" title="Registration closes after that first account">
-  `/admin/auth/register` only stays open (no `Authorization` header
-  required) while `dashboard_users` is empty — the bootstrap case above.
-  Every registration after that requires an authenticated **admin's** token
-  as the caller (`MaybeAdminUser` in `auth.rs`, enforced in
-  `AdminService::register`); a stranger who finds
-  `dashboard.truelabel.fun` gets `401`, not a new account. Adding a
-  teammate is an admin action now, not public sign-up.
+<Callout type="info" title="Self-service registration & new-user role">
+  Self-service registration (`/register`) is open to anyone without requiring an existing token.
+  New accounts registered via self-service receive the **`new-user`** role:
+  - **Permissions**: View-only access to **Crash Reports**, their own profile, and password management.
+  - **Elevation**: Users can submit an access request via `POST /api/v1/admin/auth/request-access`.
+  - **Admin Invite**: An administrator inviting a teammate via the **Team** tab (`POST /api/v1/admin/auth/register` with an admin session) creates the user with the **`member`** role immediately.
+  - **Instant Webhooks**: Webhook notifications are dispatched when new users register, when access is requested, and when roles or permissions are updated.
 </Callout>
 
 ## Password recovery

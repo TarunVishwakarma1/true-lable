@@ -40,7 +40,7 @@ export interface AdminProfile {
   name: string;
   email: string;
   occupation: string | null;
-  role: "admin" | "member";
+  role: "admin" | "member" | "new-user";
   can_edit_products: boolean;
   created_at: string;
 }
@@ -273,6 +273,13 @@ export const api = {
   logout: (token: string) =>
     request<{ signed_out: boolean }>("/api/v1/admin/auth/logout", { method: "POST", token }),
 
+  requestAccess: (token: string, input: { resource?: string; message?: string } = {}) =>
+    request<{ requested: boolean }>("/api/v1/admin/auth/request-access", {
+      method: "POST",
+      token,
+      body: input,
+    }),
+
   crashReports: {
     list: (token: string, filters: CrashReportFilters = {}) =>
       request<CrashReportPage>(`/api/v1/admin/crash-reports${query({ ...filters })}`, { token }),
@@ -295,7 +302,7 @@ export const api = {
 
   team: {
     list: (token: string) => request<AdminProfile[]>("/api/v1/admin/team", { token }),
-    updateRole: (token: string, id: string, role: "admin" | "member") =>
+    updateRole: (token: string, id: string, role: "admin" | "member" | "new-user") =>
       request<AdminProfile>(`/api/v1/admin/team/${id}/role`, { method: "PATCH", token, body: { role } }),
     resetPassword: (token: string, id: string, newPassword: string) =>
       request<{ reset: boolean }>(`/api/v1/admin/team/${id}/password`, {
@@ -340,4 +347,37 @@ export const api = {
     get: (token: string, deviceId: string) =>
       request<AdminUserDetail>(`/api/v1/admin/users/${deviceId}`, { token }),
   },
+
+  notifications: {
+    list: (token: string) =>
+      request<NotificationListResponse>("/api/v1/admin/notifications", { token }),
+    markRead: (token: string, id: string) =>
+      request<{ marked_read: boolean }>(`/api/v1/admin/notifications/${id}/read`, {
+        method: "PATCH",
+        token,
+      }),
+    markAllRead: (token: string) =>
+      request<{ all_marked_read: boolean }>("/api/v1/admin/notifications/read-all", {
+        method: "POST",
+        token,
+      }),
+  },
 };
+
+export interface DashboardNotification {
+  id: string;
+  user_id: string | null;
+  target_role: string | null;
+  title: string;
+  message: string;
+  category: "user_registration" | "access_request" | "role_change" | "permission_change" | "crash_report" | string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  items: DashboardNotification[];
+  unread_count: number;
+}
+

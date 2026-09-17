@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Field, FormError, SelectField, SubmitButton, TextArea, TextField } from "../../../components/form";
+import { RestrictedAccessView } from "../../../components/request-access";
 import { ApiError, api, type Platform, type Severity } from "../../../../lib/api";
 import { useAuth } from "../../../../lib/auth-context";
 
@@ -13,7 +14,7 @@ const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 
 export default function NewCrashReportPage() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, profile } = useAuth();
   const [platform, setPlatform] = useState<Platform>("ios");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -24,6 +25,10 @@ export default function NewCrashReportPage() {
   const [deviceModel, setDeviceModel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  if (profile?.role === "new-user") {
+    return <RestrictedAccessView resourceName="Filing Crash Reports" />;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

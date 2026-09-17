@@ -49,25 +49,21 @@ is an internal tool, not a public-facing page, and `robots.ts` says so.
   audience (newcomer, contributor, staff), out to this docs site and the
   GitHub repo. Nothing here needs the backend.
 
-## Roles
+## Roles & Permissions
 
-Two: `admin` and `member`, plus one standalone permission flag. The
-**first account ever registered becomes `admin` automatically** — that's
-what makes "I'll be the admin" true without a manual database edit. Every
-account after that starts as `member`.
+Three roles define access across the dashboard:
 
-Reading and triaging is the open default — any signed-in account can view
-crash reports, products, users, and the team list, and change a report's
-status or severity. `admin`-only actions are the ones with real external
-consequences or that touch another account's authority: **publishing a
-report to GitHub**, **changing someone's role**, **resetting a password**,
-**removing a teammate**, and **verifying a product**.
+| Role | Permissions & Access |
+|---|---|
+| **`admin`** | Full access. Manage team roles, reset passwords, grant product edit rights, remove members, verify products, publish crash reports to GitHub, view activity logs. |
+| **`member`** | Full workspace browsing. View overview, browse/search products and user accounts, view team list, triage crash reports. Can edit products if granted `can_edit_products`. |
+| **`new-user`** | Limited newcomer access. Self-registered accounts start here. Can view crash reports, manage their own profile and password, and request access/elevation from an administrator. |
 
-**Editing product data is the one exception to "role decides everything"** —
-an admin can grant a specific `member` the `can_edit_products` flag (Team
-page, per-row checkbox) without handing them the admin role itself. That
-flag never extends to verifying a product, which stays admin-only
-regardless.
+The **first account ever registered becomes `admin` automatically**. Invited teammates start as `member`. Self-registered accounts start as `new-user`.
+
+### Access Requests & Webhooks
+
+When a `new-user` submits an access request (or when an admin elevates permissions), the backend triggers an instant webhook notification (configured via `NOTIFICATION_WEBHOOK_URL`) to notify connected Slack, Discord, or custom webhook channels. Admins can promote `new-user` accounts directly from the **Team** tab.
 
 ## Where crash reports come from
 

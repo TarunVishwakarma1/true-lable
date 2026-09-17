@@ -39,7 +39,7 @@ export default function TeamPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  async function setRole(id: string, role: "admin" | "member") {
+  async function setRole(id: string, role: "admin" | "member" | "new-user") {
     if (!token) return;
     setPendingId(id);
     setError(null);
@@ -274,11 +274,12 @@ export default function TeamPage() {
                               <select
                                 value={member.role}
                                 disabled={pendingId === member.id}
-                                onChange={(e) => setRole(member.id, e.target.value as "admin" | "member")}
+                                onChange={(e) => setRole(member.id, e.target.value as "admin" | "member" | "new-user")}
                                 className="h-7 rounded-md border border-line bg-surface px-2 text-xs capitalize text-fg outline-none focus:border-accent disabled:opacity-50"
                               >
                                 <option value="admin">Admin</option>
                                 <option value="member">Member</option>
+                                <option value="new-user">New User</option>
                               </select>
                               {pendingId === member.id && (
                                 <Loader2 size={12} className="animate-spin text-muted" />

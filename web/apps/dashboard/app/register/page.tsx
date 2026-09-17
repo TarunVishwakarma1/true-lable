@@ -54,6 +54,9 @@ export default function RegisterPage() {
 
         <div className="mt-6 rounded-2xl border border-line bg-bg p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <h1 className="text-lg font-medium text-fg">Create your account</h1>
+          <p className="mt-1 text-xs text-muted leading-relaxed">
+            Register to join the TrueLabel Dashboard. New accounts start with view access to Crash Reports.
+          </p>
 
           <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
             <FormError message={error} />
