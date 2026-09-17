@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import type { InputHTMLAttributes, ButtonHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 export function Field({
@@ -47,18 +48,40 @@ export function SelectField(props: SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
+export function ButtonSpinner({
+  size = 15,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return <Loader2 size={size} className={`animate-spin shrink-0 ${className}`} aria-hidden />;
+}
+
 export function SubmitButton({
   children,
   loading,
+  loadingText,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  loading?: boolean;
+  loadingText?: string;
+}) {
   return (
     <button
       {...props}
       disabled={loading || props.disabled}
-      className={`flex h-11 w-full items-center justify-center rounded-lg bg-fg text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50 ${props.className ?? ""}`}
+      aria-busy={loading ? "true" : undefined}
+      className={`flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-fg text-sm font-medium text-bg transition-all duration-200 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${props.className ?? ""}`}
     >
-      {loading ? "…" : children}
+      {loading ? (
+        <>
+          <ButtonSpinner size={15} />
+          <span>{loadingText || children}</span>
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }

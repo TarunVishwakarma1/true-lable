@@ -46,6 +46,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -55,11 +56,12 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
+                disabled={loading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </Field>
-            <SubmitButton type="submit" loading={loading}>
+            <SubmitButton type="submit" loading={loading} loadingText="Signing in…">
               Sign in
             </SubmitButton>
           </form>

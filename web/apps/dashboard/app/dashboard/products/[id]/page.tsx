@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { VerifiedBadge } from "../../../components/badges";
 import { Skeleton } from "../../../components/skeleton";
 import { ApiError, api, type AdminUpdateProductInput, type Product } from "../../../../lib/api";
@@ -206,7 +206,7 @@ export default function ProductDetailPage() {
             <Field label="Name">
               <input
                 value={form.product_name}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, product_name: e.target.value })}
                 className={inputClass}
               />
@@ -214,7 +214,7 @@ export default function ProductDetailPage() {
             <Field label="Brand">
               <input
                 value={form.brand}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, brand: e.target.value })}
                 className={inputClass}
               />
@@ -222,7 +222,7 @@ export default function ProductDetailPage() {
             <Field label="Category">
               <input
                 value={form.category}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className={inputClass}
               />
@@ -230,7 +230,7 @@ export default function ProductDetailPage() {
             <Field label="Quantity">
               <input
                 value={form.quantity}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, quantity: e.target.value })}
                 className={inputClass}
                 placeholder="e.g. 200 g"
@@ -239,7 +239,7 @@ export default function ProductDetailPage() {
             <Field label="Image URL" span2>
               <input
                 value={form.image_url}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, image_url: e.target.value })}
                 className={inputClass}
               />
@@ -250,7 +250,7 @@ export default function ProductDetailPage() {
             <Field label="Ingredients">
               <textarea
                 value={form.ingredients}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
                 rows={3}
                 className={`${inputClass} h-auto resize-y py-2`}
@@ -262,7 +262,7 @@ export default function ProductDetailPage() {
             <Field label="Allergens (comma-separated)">
               <input
                 value={form.allergens}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, allergens: e.target.value })}
                 className={inputClass}
                 placeholder="milk, soybeans"
@@ -274,7 +274,7 @@ export default function ProductDetailPage() {
             <p className="mb-2 text-xs font-medium text-muted">Nutrition facts (JSON, per 100g)</p>
             <textarea
               value={form.nutrition_facts}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(e) => setForm({ ...form, nutrition_facts: e.target.value })}
               rows={10}
               className="w-full resize-y rounded-lg border border-line bg-surface p-3 font-mono text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
@@ -285,7 +285,7 @@ export default function ProductDetailPage() {
             <p className="mb-2 text-xs font-medium text-muted">Additives (JSON array)</p>
             <textarea
               value={form.additives}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(e) => setForm({ ...form, additives: e.target.value })}
               rows={3}
               className="w-full resize-y rounded-lg border border-line bg-surface p-3 font-mono text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
@@ -303,7 +303,7 @@ export default function ProductDetailPage() {
             <Property label="NOVA group">
               <select
                 value={form.nova_group}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, nova_group: e.target.value })}
                 className="h-7 rounded-md border border-line bg-surface px-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               >
@@ -317,7 +317,7 @@ export default function ProductDetailPage() {
             <Property label="Nutri-Score">
               <select
                 value={form.nutriscore_grade}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => setForm({ ...form, nutriscore_grade: e.target.value })}
                 className="h-7 rounded-md border border-line bg-surface px-1.5 text-xs text-fg uppercase outline-none focus:border-accent disabled:opacity-60"
               >
@@ -332,19 +332,19 @@ export default function ProductDetailPage() {
             <TriStateProperty
               label="Vegan"
               value={form.is_vegan}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(v) => setForm({ ...form, is_vegan: v })}
             />
             <TriStateProperty
               label="Vegetarian"
               value={form.is_vegetarian}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(v) => setForm({ ...form, is_vegetarian: v })}
             />
             <TriStateProperty
               label="Palm oil free"
               value={form.is_palm_oil_free}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(v) => setForm({ ...form, is_palm_oil_free: v })}
             />
             <Property label="Lookups">{product.verification_count} crowd verifications</Property>
@@ -355,10 +355,12 @@ export default function ProductDetailPage() {
             {canEdit ? (
               <button
                 onClick={save}
-                disabled={saving}
-                className="flex h-9 w-full items-center justify-center rounded-lg bg-fg text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+                disabled={saving || verifying}
+                aria-busy={saving ? "true" : undefined}
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-fg text-sm font-medium text-bg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving && <Loader2 size={14} className="animate-spin shrink-0" />}
+                <span>{saving ? "Saving changes…" : "Save changes"}</span>
               </button>
             ) : (
               <p className="text-xs text-muted">You don't have permission to edit products.</p>
@@ -366,10 +368,12 @@ export default function ProductDetailPage() {
             {canVerify && (
               <button
                 onClick={toggleVerified}
-                disabled={verifying}
-                className="flex h-9 w-full items-center justify-center rounded-lg border border-line text-sm text-fg transition-colors hover:border-fg/20 disabled:opacity-50"
+                disabled={verifying || saving}
+                aria-busy={verifying ? "true" : undefined}
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-line text-sm text-fg transition-all hover:border-fg/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {verifying ? "Updating…" : product.verified ? "Mark unverified" : "Mark verified"}
+                {verifying && <Loader2 size={14} className="animate-spin shrink-0" />}
+                <span>{verifying ? "Updating…" : product.verified ? "Mark unverified" : "Mark verified"}</span>
               </button>
             )}
             {saveError && <p className="text-xs text-red-400">{saveError}</p>}

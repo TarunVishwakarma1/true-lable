@@ -68,7 +68,7 @@ export default function NewCrashReportPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Platform">
-            <SelectField value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
+            <SelectField disabled={loading} value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
               {PLATFORMS.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -77,7 +77,7 @@ export default function NewCrashReportPage() {
             </SelectField>
           </Field>
           <Field label="Severity">
-            <SelectField value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
+            <SelectField disabled={loading} value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
               {SEVERITIES.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -88,16 +88,17 @@ export default function NewCrashReportPage() {
         </div>
 
         <Field label="Title">
-          <TextField required value={title} onChange={(e) => setTitle(e.target.value)} />
+          <TextField required disabled={loading} value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
         <Field label="Description" optional>
-          <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea rows={3} disabled={loading} value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
 
         <Field label="Stack trace" optional>
           <TextArea
             rows={6}
+            disabled={loading}
             className="font-mono text-xs"
             value={stackTrace}
             onChange={(e) => setStackTrace(e.target.value)}
@@ -106,17 +107,17 @@ export default function NewCrashReportPage() {
 
         <div className="grid grid-cols-3 gap-4">
           <Field label="App version" optional>
-            <TextField value={appVersion} onChange={(e) => setAppVersion(e.target.value)} />
+            <TextField disabled={loading} value={appVersion} onChange={(e) => setAppVersion(e.target.value)} />
           </Field>
           <Field label="OS version" optional>
-            <TextField value={osVersion} onChange={(e) => setOsVersion(e.target.value)} />
+            <TextField disabled={loading} value={osVersion} onChange={(e) => setOsVersion(e.target.value)} />
           </Field>
           <Field label="Device" optional>
-            <TextField value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} />
+            <TextField disabled={loading} value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} />
           </Field>
         </div>
 
-        <SubmitButton type="submit" loading={loading} className="w-auto self-start px-6">
+        <SubmitButton type="submit" loading={loading} loadingText="Creating report…" className="w-auto self-start px-6">
           Create report
         </SubmitButton>
       </form>

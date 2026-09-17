@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Loader2, Plus, Search } from "lucide-react";
 import { STATUS_LABEL, PlatformBadge, SeverityBadge, StatusBadge } from "../../components/badges";
-import { SkeletonRows } from "../../components/skeleton";
+import { Skeleton, SkeletonRows } from "../../components/skeleton";
 import {
   api,
   type CrashReport,
@@ -26,6 +26,7 @@ export default function CrashReportsPage() {
   const [items, setItems] = useState<CrashReport[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState<Partial<Record<ReportStatus, number>>>({});
+  const [countsLoading, setCountsLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [status, setStatus] = useState<ReportStatus | "">("");
   const [platform, setPlatform] = useState<Platform | "">("");
@@ -34,6 +35,8 @@ export default function CrashReportsPage() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isSearching = q !== debouncedQ;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -45,13 +48,15 @@ export default function CrashReportsPage() {
 
   useEffect(() => {
     if (!token) return;
+    setCountsLoading(true);
     Promise.all(STATUSES.map((s) => api.crashReports.list(token, { status: s, limit: 1 })))
       .then((pages) => {
         const next: Partial<Record<ReportStatus, number>> = {};
         STATUSES.forEach((s, i) => (next[s] = pages[i]?.total ?? 0));
         setCounts(next);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCountsLoading(false));
   }, [token]);
 
   useEffect(() => {
@@ -111,7 +116,11 @@ export default function CrashReportsPage() {
               status === s ? "border-fg/25 bg-fg/[0.04]" : "border-line hover:border-fg/15"
             }`}
           >
-            <p className="text-2xl font-medium tabular-nums text-fg">{counts[s] ?? "–"}</p>
+            {countsLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <p className="text-2xl font-medium tabular-nums text-fg">{counts[s] ?? 0}</p>
+            )}
             <p className="mt-1 truncate text-xs text-muted">{STATUS_LABEL[s]}</p>
           </button>
         ))}
@@ -124,8 +133,11 @@ export default function CrashReportsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search reports…"
-            className="h-8 w-52 rounded-md border border-line bg-surface pr-2.5 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
+            className="h-8 w-52 rounded-md border border-line bg-surface pr-7 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
           />
+          {(loading || isSearching) && (
+            <Loader2 size={13} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 animate-spin text-muted" />
+          )}
         </div>
         <Select label="Platform" value={platform} onChange={resetAnd(setPlatform)} options={PLATFORMS} />
         <Select label="Severity" value={severity} onChange={resetAnd(setSeverity)} options={SEVERITIES} />
@@ -187,8 +199,8 @@ export default function CrashReportsPage() {
       <div className="mt-4 flex items-center justify-between text-sm">
         <button
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          disabled={offset === 0}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+          disabled={offset === 0 || loading}
+          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
         >
           ← Previous
         </button>
@@ -197,8 +209,8 @@ export default function CrashReportsPage() {
         </span>
         <button
           onClick={() => setOffset(offset + PAGE_SIZE)}
-          disabled={offset + PAGE_SIZE >= total}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+          disabled={offset + PAGE_SIZE >= total || loading}
+          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Next →
         </button>

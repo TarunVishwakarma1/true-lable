@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ExternalLink, Github } from "lucide-react";
+import { ArrowLeft, ExternalLink, Github, Loader2 } from "lucide-react";
 import { STATUS_LABEL, PlatformBadge, SeverityBadge } from "../../../components/badges";
 import { Skeleton } from "../../../components/skeleton";
 import { ApiError, api, type CrashReport, type ReportStatus, type Severity } from "../../../../lib/api";
@@ -18,6 +18,7 @@ export default function CrashReportDetailPage() {
   const [report, setReport] = useState<CrashReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingField, setUpdatingField] = useState<"status" | "severity" | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -30,12 +31,16 @@ export default function CrashReportDetailPage() {
       .finally(() => setLoading(false));
   }, [token, id]);
 
-  async function updateField(patch: { status?: ReportStatus; severity?: Severity }) {
+  async function updateField(patch: { status?: ReportStatus; severity?: Severity }, field: "status" | "severity") {
     if (!token) return;
+    setUpdatingField(field);
+    setError(null);
     try {
       setReport(await api.crashReports.update(token, id, patch));
     } catch {
       setError("Couldn't save that change.");
+    } finally {
+      setUpdatingField(null);
     }
   }
 
@@ -121,31 +126,43 @@ export default function CrashReportDetailPage() {
         <aside className="w-full shrink-0 sm:w-56">
           <div className="rounded-xl border border-line p-4">
             <Property label="Status">
-              <select
-                value={report.status}
-                onChange={(e) => updateField({ status: e.target.value as ReportStatus })}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </option>
-                ))}
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={report.status}
+                  disabled={updatingField !== null}
+                  onChange={(e) => updateField({ status: e.target.value as ReportStatus }, "status")}
+                  className="h-8 w-full rounded-md border border-line bg-surface pr-7 pl-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+                {updatingField === "status" && (
+                  <Loader2 size={13} className="pointer-events-none absolute right-2 animate-spin text-muted" />
+                )}
+              </div>
             </Property>
 
             <Property label="Severity">
-              <select
-                value={report.severity}
-                onChange={(e) => updateField({ severity: e.target.value as Severity })}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg capitalize outline-none focus:border-accent"
-              >
-                {SEVERITIES.map((s) => (
-                  <option key={s} value={s} className="capitalize">
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={report.severity}
+                  disabled={updatingField !== null}
+                  onChange={(e) => updateField({ severity: e.target.value as Severity }, "severity")}
+                  className="h-8 w-full rounded-md border border-line bg-surface pr-7 pl-2 text-xs text-fg capitalize outline-none focus:border-accent disabled:opacity-60"
+                >
+                  {SEVERITIES.map((s) => (
+                    <option key={s} value={s} className="capitalize">
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                {updatingField === "severity" && (
+                  <Loader2 size={13} className="pointer-events-none absolute right-2 animate-spin text-muted" />
+                )}
+              </div>
             </Property>
 
             <Property label="Platform">
@@ -186,10 +203,11 @@ export default function CrashReportDetailPage() {
                 <button
                   onClick={publish}
                   disabled={publishing}
-                  className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-fg text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={publishing ? "true" : undefined}
+                  className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-fg text-sm font-medium text-bg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Github size={14} />
-                  {publishing ? "Publishing…" : "Publish to GitHub"}
+                  {publishing ? <Loader2 size={14} className="animate-spin shrink-0" /> : <Github size={14} />}
+                  <span>{publishing ? "Publishing to GitHub…" : "Publish to GitHub"}</span>
                 </button>
                 {publishError && <p className="mt-2 text-xs text-red-400">{publishError}</p>}
               </>

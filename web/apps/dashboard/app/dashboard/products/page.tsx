@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { VerifiedBadge } from "../../components/badges";
 import { SkeletonRows } from "../../components/skeleton";
 import { api, type Product } from "../../../lib/api";
@@ -21,6 +21,8 @@ export default function ProductsPage() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isSearching = q !== debouncedQ;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -63,8 +65,11 @@ export default function ProductsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, brand, barcode…"
-            className="h-8 w-64 rounded-md border border-line bg-surface pr-2.5 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
+            className="h-8 w-64 rounded-md border border-line bg-surface pr-7 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
           />
+          {(loading || isSearching) && (
+            <Loader2 size={13} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 animate-spin text-muted" />
+          )}
         </div>
         <select
           value={verified}
@@ -125,8 +130,8 @@ export default function ProductsPage() {
       <div className="mt-4 flex items-center justify-between text-sm">
         <button
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          disabled={offset === 0}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+          disabled={offset === 0 || loading}
+          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
         >
           ← Previous
         </button>
@@ -135,8 +140,8 @@ export default function ProductsPage() {
         </span>
         <button
           onClick={() => setOffset(offset + PAGE_SIZE)}
-          disabled={offset + PAGE_SIZE >= total}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+          disabled={offset + PAGE_SIZE >= total || loading}
+          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Next →
         </button>

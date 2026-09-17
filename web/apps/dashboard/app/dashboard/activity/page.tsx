@@ -113,8 +113,8 @@ export default function ActivityPage() {
         <div className="mt-4 flex items-center justify-between text-sm">
           <button
             onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            disabled={offset === 0}
-            className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+            disabled={offset === 0 || loading}
+            className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
           >
             ← Previous
           </button>
@@ -123,8 +123,8 @@ export default function ActivityPage() {
           </span>
           <button
             onClick={() => setOffset(offset + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= total}
-            className="text-muted transition-colors hover:text-fg disabled:opacity-30"
+            disabled={offset + PAGE_SIZE >= total || loading}
+            className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Next →
           </button>

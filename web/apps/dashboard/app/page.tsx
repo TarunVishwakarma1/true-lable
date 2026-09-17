@@ -15,8 +15,14 @@ export default function Home() {
   }, [loading, profile, router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <Skeleton className="h-8 w-8 rounded-full" />
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg">
+      <p className="font-mono text-sm font-medium tracking-tight text-fg">
+        True<span className="text-accent">Label</span>
+      </p>
+      <div className="flex items-center gap-2 text-xs text-muted">
+        <Skeleton className="h-3 w-3 rounded-full" />
+        <span>Redirecting…</span>
+      </div>
     </main>
   );
 }

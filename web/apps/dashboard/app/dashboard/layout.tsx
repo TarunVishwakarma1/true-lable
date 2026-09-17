@@ -30,8 +30,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (loading || !profile) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Skeleton className="h-8 w-8 rounded-full" />
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg">
+        <div className="flex items-center gap-2">
+          <Image src="/brand/logo-light.png" alt="" width={128} height={128} className="h-7 w-7 rounded-md dark:hidden" />
+          <Image src="/brand/logo-dark.png" alt="" width={128} height={128} className="hidden h-7 w-7 rounded-md dark:block" />
+          <span className="font-mono text-sm font-medium tracking-tight text-fg">
+            True<span className="text-accent">Label</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <Skeleton className="h-3 w-3 rounded-full" />
+          <span>Loading workspace…</span>
+        </div>
       </main>
     );
   }

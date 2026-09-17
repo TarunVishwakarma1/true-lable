@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { ApiError, api, type AdminProfile, type RegisterInput } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 import { SkeletonRows } from "../../components/skeleton";
@@ -141,32 +141,36 @@ export default function TeamPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Name">
               <input
+                disabled={inviteBusy}
                 value={inviteInput.name}
                 onChange={(e) => setInviteInput((v) => ({ ...v, name: e.target.value }))}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               />
             </Field>
             <Field label="Email">
               <input
                 type="email"
+                disabled={inviteBusy}
                 value={inviteInput.email}
                 onChange={(e) => setInviteInput((v) => ({ ...v, email: e.target.value }))}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               />
             </Field>
             <Field label="Occupation (optional)">
               <input
+                disabled={inviteBusy}
                 value={inviteInput.occupation}
                 onChange={(e) => setInviteInput((v) => ({ ...v, occupation: e.target.value }))}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               />
             </Field>
             <Field label="Initial password">
               <input
                 type="password"
+                disabled={inviteBusy}
                 value={inviteInput.password}
                 onChange={(e) => setInviteInput((v) => ({ ...v, password: e.target.value }))}
-                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                className="h-8 w-full rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               />
             </Field>
           </div>
@@ -175,9 +179,11 @@ export default function TeamPage() {
             <button
               onClick={submitInvite}
               disabled={inviteBusy || !inviteInput.name || !inviteInput.email || !inviteInput.password}
-              className="h-8 rounded-md bg-fg px-3 text-xs font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+              aria-busy={inviteBusy ? "true" : undefined}
+              className="flex h-8 items-center gap-1.5 rounded-md bg-fg px-3 text-xs font-medium text-bg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {inviteBusy ? "Sending invite…" : "Send invite"}
+              {inviteBusy && <Loader2 size={13} className="animate-spin shrink-0" />}
+              <span>{inviteBusy ? "Sending invite…" : "Send invite"}</span>
             </button>
             <button
               onClick={() => {
@@ -185,7 +191,8 @@ export default function TeamPage() {
                 setInviteError(null);
                 setInviteInput(emptyInvite);
               }}
-              className="h-8 rounded-md px-3 text-xs text-muted transition-colors hover:text-fg"
+              disabled={inviteBusy}
+              className="h-8 rounded-md px-3 text-xs text-muted transition-colors hover:text-fg disabled:opacity-50"
             >
               Cancel
             </button>
@@ -222,15 +229,20 @@ export default function TeamPage() {
                     <td className="px-4 py-3">
                       {me?.role === "admin" ? (
                         <div className="flex flex-col gap-1.5">
-                          <select
-                            value={member.role}
-                            disabled={pendingId === member.id}
-                            onChange={(e) => setRole(member.id, e.target.value as "admin" | "member")}
-                            className="h-8 rounded-md border border-line bg-surface px-2 text-xs text-fg capitalize outline-none focus:border-accent disabled:opacity-50"
-                          >
-                            <option value="admin">Admin</option>
-                            <option value="member">Member</option>
-                          </select>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={member.role}
+                              disabled={pendingId === member.id}
+                              onChange={(e) => setRole(member.id, e.target.value as "admin" | "member")}
+                              className="h-8 rounded-md border border-line bg-surface px-2 text-xs text-fg capitalize outline-none focus:border-accent disabled:opacity-50"
+                            >
+                              <option value="admin">Admin</option>
+                              <option value="member">Member</option>
+                            </select>
+                            {pendingId === member.id && (
+                              <Loader2 size={13} className="animate-spin text-muted" />
+                            )}
+                          </div>
                           {member.role === "member" && (
                             <label className="flex items-center gap-1.5 text-xs text-muted">
                               <input
@@ -268,13 +280,16 @@ export default function TeamPage() {
                                 <button
                                   onClick={() => removeMember(member.id)}
                                   disabled={removeBusy}
-                                  className="text-xs font-medium text-red-400 transition-colors hover:text-red-300 disabled:opacity-50"
+                                  aria-busy={removeBusy ? "true" : undefined}
+                                  className="flex items-center gap-1 text-xs font-medium text-red-400 transition-colors hover:text-red-300 disabled:opacity-50"
                                 >
-                                  {removeBusy ? "Removing…" : "Confirm"}
+                                  {removeBusy && <Loader2 size={11} className="animate-spin shrink-0" />}
+                                  <span>{removeBusy ? "Removing…" : "Confirm"}</span>
                                 </button>
                                 <button
                                   onClick={() => setConfirmRemoveId(null)}
-                                  className="text-xs text-muted transition-colors hover:text-fg"
+                                  disabled={removeBusy}
+                                  className="text-xs text-muted transition-colors hover:text-fg disabled:opacity-50"
                                 >
                                   Cancel
                                 </button>
@@ -309,16 +324,19 @@ export default function TeamPage() {
                           <input
                             type="password"
                             placeholder="At least 8 characters"
+                            disabled={resetBusy}
                             value={resetPassword}
                             onChange={(e) => setResetPassword(e.target.value)}
-                            className="h-8 w-52 rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                            className="h-8 w-52 rounded-md border border-line bg-surface px-2 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
                           />
                           <button
                             onClick={() => submitReset(member.id)}
                             disabled={resetBusy || resetPassword.length < 8}
-                            className="h-8 shrink-0 rounded-md bg-fg px-3 text-xs font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+                            aria-busy={resetBusy ? "true" : undefined}
+                            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-fg px-3 text-xs font-medium text-bg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {resetBusy ? "Saving…" : "Save"}
+                            {resetBusy && <Loader2 size={12} className="animate-spin shrink-0" />}
+                            <span>{resetBusy ? "Saving…" : "Save"}</span>
                           </button>
                           <button
                             onClick={() => {
@@ -326,7 +344,8 @@ export default function TeamPage() {
                               setResetError(null);
                               setResetPassword("");
                             }}
-                            className="h-8 shrink-0 rounded-md px-2 text-xs text-muted transition-colors hover:text-fg"
+                            disabled={resetBusy}
+                            className="h-8 shrink-0 rounded-md px-2 text-xs text-muted transition-colors hover:text-fg disabled:opacity-50"
                           >
                             Cancel
                           </button>

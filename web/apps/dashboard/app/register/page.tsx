@@ -61,6 +61,7 @@ export default function RegisterPage() {
               <TextField
                 autoComplete="name"
                 required
+                disabled={loading}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -70,6 +71,7 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -78,6 +80,7 @@ export default function RegisterPage() {
               <Field label="Date of birth" optional>
                 <TextField
                   type="date"
+                  disabled={loading}
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
                 />
@@ -85,6 +88,7 @@ export default function RegisterPage() {
               <Field label="Occupation" optional>
                 <TextField
                   placeholder="e.g. Engineer"
+                  disabled={loading}
                   value={occupation}
                   onChange={(e) => setOccupation(e.target.value)}
                 />
@@ -96,6 +100,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 minLength={8}
+                disabled={loading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -106,11 +111,12 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 minLength={8}
+                disabled={loading}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </Field>
-            <SubmitButton type="submit" loading={loading}>
+            <SubmitButton type="submit" loading={loading} loadingText="Creating account…">
               Create account
             </SubmitButton>
           </form>
