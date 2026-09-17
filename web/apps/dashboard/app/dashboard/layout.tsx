@@ -22,9 +22,13 @@ import { Skeleton } from "../components/skeleton";
 import { RestrictedAccessView, RequestAccessModal } from "../components/request-access";
 import { NotificationCenter } from "../components/notification-center";
 
+// One stroke weight for every icon in the console. The old shell mixed 1.8,
+// 2.2 and 2.5, which is why the sidebar never looked like one set.
+const STROKE = 1.75;
+
 const LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid, restrictedForNewUsers: true },
-  { href: "/dashboard/crash-reports", label: "Crash Reports", icon: Bug, restrictedForNewUsers: false },
+  { href: "/dashboard/crash-reports", label: "Crash reports", icon: Bug, restrictedForNewUsers: false },
   { href: "/dashboard/products", label: "Products", icon: Package, restrictedForNewUsers: true },
   { href: "/dashboard/users", label: "Users", icon: CircleUser, restrictedForNewUsers: true },
   { href: "/dashboard/team", label: "Team", icon: Users, restrictedForNewUsers: true },
@@ -44,8 +48,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (loading || !profile) {
     return (
-      <main className="flex h-screen items-center justify-center bg-bg text-fg">
-        <Skeleton className="h-8 w-8 rounded-full" />
+      <main className="flex h-dvh items-center justify-center bg-bg">
+        <div className="flex flex-col items-center gap-4">
+          <Skeleton className="h-9 w-9 rounded-[10px]" />
+          <Skeleton className="h-2.5 w-24" />
+        </div>
       </main>
     );
   }
@@ -57,32 +64,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isRestrictedPath = isNewUser && currentLink?.restrictedForNewUsers;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg text-fg">
-      {/* Fixed Sidebar with independent scroll */}
-      <aside className="flex h-full w-60 shrink-0 flex-col border-r border-line bg-bg px-4 py-5 overflow-y-auto">
-        {/* Brand Header */}
-        <Link href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-1">
+    <div className="flex h-dvh overflow-hidden bg-bg text-fg">
+      <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-line px-3 py-5">
+        <Link
+          href="/dashboard"
+          className="pressable flex items-center gap-2.5 rounded-[10px] px-3 py-1.5 hover:bg-hover"
+        >
           <Image
             src="/brand/logo-light.png"
-            alt="TrueLabel"
-            width={24}
-            height={24}
-            className="h-6 w-6 rounded-md dark:hidden"
+            alt=""
+            width={26}
+            height={26}
+            className="h-[26px] w-[26px] rounded-[7px] dark:hidden"
           />
           <Image
             src="/brand/logo-dark.png"
-            alt="TrueLabel"
-            width={24}
-            height={24}
-            className="hidden h-6 w-6 rounded-md dark:block"
+            alt=""
+            width={26}
+            height={26}
+            className="hidden h-[26px] w-[26px] rounded-[7px] dark:block"
           />
-          <span className="font-mono text-sm font-semibold tracking-tight text-fg">
-            True<span className="text-accent">Label</span>
+          <span className="display text-[19px] text-fg">
+            True<span className="text-fg3">Label</span>
           </span>
         </Link>
 
-        {/* Navigation Links */}
-        <nav className="mt-6 flex flex-col gap-1">
+        <p className="eyebrow mt-7 px-3">Operations</p>
+
+        <nav className="mt-2.5 flex flex-col gap-0.5">
           {LINKS.map((link) => {
             const active =
               link.href === "/dashboard"
@@ -95,56 +104,57 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+                aria-current={active ? "page" : undefined}
+                className={`pressable group relative flex items-center justify-between rounded-[10px] py-2 pl-3 pr-2.5 text-[13px] ${
                   active
-                    ? "bg-fg/[0.08] text-fg font-semibold shadow-xs"
-                    : "text-muted hover:bg-fg/[0.04] hover:text-fg"
+                    ? "bg-accent-soft font-medium text-fg"
+                    : "text-fg2 hover:bg-hover hover:text-fg"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <Icon size={15} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-fg" : "text-muted"} />
-                  <span>{link.label}</span>
-                </div>
-                {locked && (
-                  <Lock size={12} className="text-muted/60" />
+                {/* The marker, not another background wash — it reads at a
+                    glance even when the tint is this quiet. */}
+                {active && (
+                  <span
+                    className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full bg-accent"
+                    aria-hidden
+                  />
                 )}
+                <span className="flex items-center gap-2.5">
+                  <Icon
+                    size={15}
+                    strokeWidth={STROKE}
+                    className={active ? "text-fg" : "text-fg3 group-hover:text-fg2"}
+                  />
+                  <span>{link.label}</span>
+                </span>
+                {locked && <Lock size={11} strokeWidth={STROKE} className="text-fg3" />}
               </Link>
             );
           })}
         </nav>
 
-        {/* New-User Elevation Banner in Sidebar */}
         {isNewUser && (
-          <div className="mt-6 rounded-xl border border-line bg-surface/60 p-3 text-xs">
-            <p className="font-medium text-fg">Limited Access</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted">
-              You have view access to Crash Reports. Need more permissions?
+          <div className="mt-7 rounded-[14px] border border-line bg-surface p-3.5">
+            <p className="text-[13px] font-medium text-fg">Limited access</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-fg3">
+              You can read crash reports. Everything else needs an upgrade.
             </p>
             <button
               onClick={() => setAccessModalOpen(true)}
-              className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-fg px-2.5 py-1.5 text-[11px] font-medium text-bg hover:opacity-90 shadow-xs"
+              className="pressable mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[9px] bg-accent px-2.5 py-1.5 text-[12px] font-medium text-on-accent hover:opacity-90"
             >
-              <KeyRound size={12} />
-              <span>Request Upgrade</span>
+              <KeyRound size={12} strokeWidth={STROKE} />
+              <span>Request upgrade</span>
             </button>
           </div>
         )}
 
-        {/* User Footer */}
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-4">
-          <div className="min-w-0 pl-1">
-            <p className="truncate text-xs font-medium text-fg">{profile.name}</p>
-            <span className={`inline-block rounded-md px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
-              profile.role === "admin"
-                ? "bg-accent/15 text-accent"
-                : profile.role === "member"
-                ? "bg-fg/[0.08] text-fg"
-                : "bg-amber-500/15 text-amber-500"
-            }`}>
-              {profile.role}
-            </span>
+          <div className="min-w-0 pl-1.5">
+            <p className="truncate text-[13px] font-medium text-fg">{profile.name}</p>
+            <p className="eyebrow mt-1">{profile.role}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5">
             <div className="scale-75">
               <ThemeToggle />
             </div>
@@ -155,45 +165,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}
               title="Sign out"
               aria-label="Sign out"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/[0.08] hover:text-fg"
+              className="pressable flex h-7 w-7 items-center justify-center rounded-[9px] text-fg3 hover:bg-hover hover:text-fg"
             >
-              <LogOut size={14} />
+              <LogOut size={14} strokeWidth={STROKE} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Area with Top Header and independent vertical scroll */}
-      <div className="flex-1 flex flex-col h-full min-w-0 bg-bg text-fg">
-        {/* Top Header Bar */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-line px-6 bg-bg/80 backdrop-blur-md z-30">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-muted">Dashboard</span>
-            <span className="text-muted/40">/</span>
-            <span className="text-xs font-semibold text-fg">{currentLink?.label ?? "Overview"}</span>
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        <header className="z-30 flex h-14 shrink-0 items-center justify-between border-b border-line bg-bg/85 px-8 backdrop-blur-md">
+          <div className="flex items-baseline gap-2.5">
+            <span className="eyebrow">Dashboard</span>
+            <span className="text-fg3">/</span>
+            <span className="display text-[17px] text-fg">{currentLink?.label ?? "Overview"}</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <NotificationCenter />
-          </div>
+          <NotificationCenter />
         </header>
 
-        {/* Main Content Pane */}
-        <div className="flex-1 h-full min-w-0 overflow-y-auto bg-bg text-fg">
+        <main id="main" className="h-full min-w-0 flex-1 overflow-y-auto">
           {isRestrictedPath ? (
             <RestrictedAccessView resourceName={currentLink?.label} />
           ) : (
             children
           )}
-        </div>
+        </main>
       </div>
 
-      <RequestAccessModal
-        isOpen={accessModalOpen}
-        onClose={() => setAccessModalOpen(false)}
-      />
+      <RequestAccessModal isOpen={accessModalOpen} onClose={() => setAccessModalOpen(false)} />
     </div>
   );
 }
-
-

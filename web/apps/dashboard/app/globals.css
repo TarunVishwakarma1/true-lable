@@ -3,64 +3,115 @@
 @source "../../../packages/ui/src";
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Light theme (Daylight) */
+/* TrueLabel operations console.
+   The palette is the product's own, ported from ios/truelable/Design/Theme.swift:
+   a warm charcoal ramp with bone as the single piece of chrome. The rule that
+   matters, and the one this dashboard used to break: the brand colour and the
+   verdict colours are never the same. Bone is the brand. Hue always means
+   something — a grade, a status, a severity — and never decorates. */
+
+/* Daylight: warm paper, the printed label lit. */
 :root {
-  --bg: #f3f0e8;
-  --fg: #171612;
-  --muted: #6f6a5f;
-  --line: rgba(23, 22, 18, 0.12);
-  --line-subtle: rgba(23, 22, 18, 0.06);
-  --line-strong: rgba(23, 22, 18, 0.2);
-  --surface: #faf8f2;
-  --surface-raised: #ffffff;
-  --surface-hover: rgba(23, 22, 18, 0.04);
-  --accent: #0070f3;
-  --accent-glow: rgba(0, 112, 243, 0.25);
-  --success: #10b981;
-  --success-glow: rgba(16, 185, 129, 0.25);
-  --warn: #f59e0b;
-  --warn-glow: rgba(245, 158, 11, 0.25);
-  --danger: #ef4444;
-  --danger-glow: rgba(239, 68, 68, 0.25);
+  --bg: #f4efe2;
+  --surface: #fbf8f0;
+  --elevated: #ffffff;
+  --fg: #1b1813;
+  --fg2: #57514a;
+  --fg3: #8a8175;
+  --line: rgba(27, 24, 19, 0.12);
+  --line-subtle: rgba(27, 24, 19, 0.06);
+  --line-strong: rgba(27, 24, 19, 0.22);
+  --hover: rgba(27, 24, 19, 0.04);
+  /* The pages this pass doesn't rewrite still say text-muted. Pointing it at
+     the warm neutral drags them along rather than leaving them cold. */
+  --muted: #57514a;
+
+  /* Chrome. On paper the brand reads as ink; on charcoal it reads as bone.
+     Either way it is a neutral, so it never competes with a verdict. */
+  --accent: #2a2620;
+  --accent-soft: rgba(42, 38, 32, 0.08);
+  --on-accent: #f4efe2;
+
+  --grain: 0.035;
   color-scheme: light;
 }
 
-/* Dark theme (Vercel Pure Black) */
+/* Night: the app's own ground. Warm charcoal, never cold, never pure black. */
 .dark {
-  --bg: #000000;
-  --fg: #ededed;
-  --muted: #888888;
-  --line: rgba(255, 255, 255, 0.1);
-  --line-subtle: rgba(255, 255, 255, 0.05);
-  --line-strong: rgba(255, 255, 255, 0.18);
-  --surface: #09090b;
-  --surface-raised: #121212;
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --accent: #0070f3;
-  --accent-glow: rgba(0, 112, 243, 0.35);
-  --success: #00e599;
-  --success-glow: rgba(0, 229, 153, 0.35);
-  --warn: #f5a623;
-  --warn-glow: rgba(245, 166, 35, 0.35);
-  --danger: #ff0055;
-  --danger-glow: rgba(255, 0, 85, 0.35);
+  --bg: #0c0b0a;
+  --surface: #171512;
+  --elevated: #221f1b;
+  --fg: #f3efe7;
+  --fg2: #b8b1a6;
+  --fg3: #8a837a;
+  --line: rgba(239, 230, 212, 0.1);
+  --line-subtle: rgba(239, 230, 212, 0.05);
+  --line-strong: rgba(239, 230, 212, 0.2);
+  --hover: rgba(239, 230, 212, 0.05);
+  --muted: #b8b1a6;
+
+  --accent: #efe6d4;
+  --accent-soft: rgba(239, 230, 212, 0.1);
+  --on-accent: #141210;
+
+  --grain: 0.055;
   color-scheme: dark;
 }
 
+/* The verdict ramp, identical in both themes so a status never changes meaning
+   when the lights go out. Lifted from the Nutri-Score scale the app publishes. */
+:root,
+.dark {
+  --good: #4fbf73;
+  --fair: #a3c63f;
+  --warn: #e9b23c;
+  --poor: #e68a3c;
+  --danger: #e05b47;
+  /* Series colours for charts: hues that carry no judgement of their own. */
+  --info: #6fa8ff;
+  --violet: #a98be8;
+}
+
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
   --color-bg: var(--bg);
-  --color-fg: var(--fg);
-  --color-muted: var(--muted);
-  --color-line: var(--line);
   --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-fg: var(--fg);
+  --color-fg2: var(--fg2);
+  --color-fg3: var(--fg3);
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+  --color-line-strong: var(--line-strong);
+  --color-hover: var(--hover);
+
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-good: var(--good);
+  --color-fair: var(--fair);
+  --color-warn: var(--warn);
+  --color-poor: var(--poor);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-violet: var(--violet);
+
+  /* Tailwind's own radius scale is deliberately left alone. Rebinding
+     --radius-lg to the app's 24px would silently re-round every input and
+     button on the pages this pass doesn't touch. Container radii are written
+     literally instead: 20 outside, 10 inside, 5 on tags. */
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
   height: 100%;
 }
+
 body {
   min-height: 100%;
   font-family: var(--font-sans);
@@ -68,30 +119,131 @@ body {
   color: var(--fg);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom glowing pulse animations for status dots */
-@keyframes status-glow-green {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
+/* Grain. A flat fill reads as a screenshot of an interface; a fill with a
+   little tooth reads as a surface. Fixed, so it never scrolls with content. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.glow-dot-ready {
-  background-color: var(--success);
-  box-shadow: 0 0 8px var(--success-glow);
+@media (prefers-reduced-transparency: reduce) {
+  body::after {
+    display: none;
+  }
 }
 
-.glow-dot-blue {
-  background-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+/* Numerals line up in columns or they are not data. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
-.glow-dot-amber {
-  background-color: var(--warn);
-  box-shadow: 0 0 8px var(--warn-glow);
+/* Display type: editorial, tight, and allowed to be large. The app sets its
+   headings in a serif for the same reason — it is the one thing on screen
+   that should not look like software. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+  text-wrap: balance;
 }
 
-.glow-dot-red {
-  background-color: var(--danger);
-  box-shadow: 0 0 8px var(--danger-glow);
+/* Small caps labels. Positive tracking, because letterforms this small need
+   air between them to stay legible. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+
+/* One press feedback for everything tappable, so the whole console responds
+   with the same weight. */
+.pressable {
+  transition:
+    transform 140ms var(--ease-out-expo),
+    background-color 180ms var(--ease-out-expo),
+    color 180ms var(--ease-out-expo),
+    border-color 180ms var(--ease-out-expo);
+}
+.pressable:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable,
+  .pressable:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Status dots. The glow is the verdict colour at low alpha, not a generic
+   black shadow, so the light in the room matches the light on the object. */
+.dot {
+  height: 7px;
+  width: 7px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.dot-good {
+  background: var(--good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 18%, transparent);
+}
+.dot-fair {
+  background: var(--fair);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fair) 18%, transparent);
+}
+.dot-warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.dot-poor {
+  background: var(--poor);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--poor) 18%, transparent);
+}
+.dot-danger {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.dot-info {
+  background: var(--info);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 18%, transparent);
+}
+.dot-idle {
+  background: var(--fg3);
+}
+
+/* Skeletons sweep rather than blink: a pulse says "broken", a sweep says
+   "arriving". */
+@keyframes shimmer {
+  to {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--line-subtle) 0%,
+    var(--hover) 40%,
+    var(--line-subtle) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
 }

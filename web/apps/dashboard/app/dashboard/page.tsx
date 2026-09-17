@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { ArrowUpRight, Bug, CheckCircle2, Clock, Plus, TrendingUp } from "lucide-react";
+import { MotionConfig, motion } from "motion/react";
+import { ArrowUpRight, Bug, Plus } from "lucide-react";
 import { PlatformBadge, STATUS_LABEL, SeverityBadge, StatusBadge } from "../components/badges";
 import { Skeleton, SkeletonRows } from "../components/skeleton";
 import { api, type CrashReport, type ReportStatus } from "../../lib/api";
@@ -12,6 +13,35 @@ import { useAuth } from "../../lib/auth-context";
 
 const STATUSES: ReportStatus[] = ["submitted", "pending", "in_review", "in_progress", "done", "wont_fix"];
 const TREND_DAYS = 14;
+const STROKE = 1.75;
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+// Same walk as the status dots in badges.tsx: nothing yet, waiting, being
+// looked at, moving, done. A bar chart where every bar is the same colour is
+// a bar chart that only encodes length.
+const STATUS_BAR: Record<ReportStatus, string> = {
+  submitted: "bg-fg3",
+  pending: "bg-warn",
+  in_review: "bg-info",
+  in_progress: "bg-fair",
+  done: "bg-good",
+  wont_fix: "bg-fg3/40",
+};
+
+/** Sections arrive in sequence rather than all at once — it reads as the page
+ *  assembling itself, and it costs one prop. */
+function Section({ delay = 0, className = "", children }: { delay?: number; className?: string; children: React.ReactNode }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay, ease: EASE }}
+      className={className}
+    >
+      {children}
+    </motion.section>
+  );
+}
 
 export default function DashboardHome() {
   const { profile, token } = useAuth();
@@ -61,231 +91,205 @@ export default function DashboardHome() {
   const firstName = profile?.name.split(" ")[0];
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
-      {/* Welcome Banner */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">
-            Welcome back{firstName ? `, ${firstName}` : ""}
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            {profile?.email} · {profile?.role} access
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <MotionConfig reducedMotion="user">
+      <div className="mx-auto max-w-[1180px] px-8 pb-20 pt-10">
+        {/* The headline is the state of the queue, not a greeting. The greeting
+            is still there, just sized like the aside it actually is. */}
+        <Section className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="eyebrow">Welcome back{firstName ? `, ${firstName}` : ""}</p>
+            {loading ? (
+              <Skeleton className="mt-3 h-11 w-[340px]" />
+            ) : (
+              <h1 className="display mt-2.5 text-[42px] text-fg">
+                {open > 0 ? (
+                  <>
+                    <span className="tnum">{open}</span>{" "}
+                    {open === 1 ? "report needs" : "reports need"} attention
+                  </>
+                ) : (
+                  "Nothing needs attention"
+                )}
+              </h1>
+            )}
+            {loading ? (
+              <Skeleton className="mt-3 h-3 w-[220px]" />
+            ) : (
+              <p className="mt-2.5 text-[13px] text-fg2">
+                <span className="tnum font-medium text-fg">{total}</span> logged all time ·{" "}
+                <span className="tnum font-medium text-fg">{resolved}</span> resolved
+              </p>
+            )}
+          </div>
+
           <Link
             href="/dashboard/crash-reports/new"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg transition-all hover:opacity-90 shadow-xs"
+            className="pressable inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-on-accent hover:opacity-90"
           >
-            <Plus size={13} strokeWidth={2.5} />
+            <Plus size={14} strokeWidth={2} />
             <span>New report</span>
           </Link>
-        </div>
-      </div>
+        </Section>
 
-      {/* Metrics Row */}
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile
-          label="Total Crash Reports"
-          value={total}
-          description="All time logged reports"
-          loading={loading}
-          icon={Bug}
-        />
-        <StatTile
-          label="Active / In Progress"
-          value={open}
-          description="Submitted, pending, or in review"
-          loading={loading}
-          icon={Clock}
-          highlight={open > 0}
-        />
-        <StatTile
-          label="Resolved Reports"
-          value={resolved}
-          description="Marked done by team"
-          loading={loading}
-          icon={CheckCircle2}
-        />
-      </div>
-
-      {/* Chart & Status Breakdown */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* Trend Area Chart */}
-        <div className="rounded-xl border border-line bg-surface p-5 lg:col-span-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-fg">Activity volume, last {TREND_DAYS} days</p>
-            <span className="flex items-center gap-1 text-[11px] text-accent font-mono">
-              <TrendingUp size={12} />
-              <span>Crash reports volume</span>
-            </span>
-          </div>
-          {loading ? (
-            <Skeleton className="mt-4 h-44 w-full" />
-          ) : (
-            <div className="mt-4 h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
-                  <defs>
-                    <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0070f3" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#0070f3" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 10, fill: "var(--muted)" }}
-                    axisLine={false}
-                    tickLine={false}
-                    interval={2}
-                  />
-                  <Tooltip
-                    cursor={{ stroke: "var(--line)" }}
-                    contentStyle={{
-                      background: "var(--surface)",
-                      border: "1px solid var(--line)",
-                      borderRadius: 8,
-                      fontSize: 11,
-                      color: "var(--fg)",
-                    }}
-                    labelStyle={{ color: "var(--muted)" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#0070f3"
-                    strokeWidth={2}
-                    fill="url(#trendFill)"
-                    name="Reports"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+        <div className="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-5">
+          <Section delay={0.06} className="rounded-[20px] border border-line bg-surface p-6 lg:col-span-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-[13px] font-medium text-fg">Intake volume</h2>
+              <p className="eyebrow">Last {TREND_DAYS} days</p>
             </div>
-          )}
-        </div>
+            {loading ? (
+              <Skeleton className="mt-5 h-48 w-full" />
+            ) : (
+              <div className="mt-5 h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  {/* Headroom at the top, or a spike on the last day gets
+                      clipped by the panel edge. */}
+                  <AreaChart data={trend} margin={{ top: 14, right: 6, bottom: 0, left: -28 }}>
+                    <defs>
+                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: "var(--fg3)" }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={2}
+                    />
+                    <Tooltip
+                      cursor={{ stroke: "var(--line-strong)" }}
+                      contentStyle={{
+                        background: "var(--elevated)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                        fontSize: 12,
+                        color: "var(--fg)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+                      }}
+                      labelStyle={{ color: "var(--fg3)" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="var(--accent)"
+                      strokeWidth={1.75}
+                      fill="url(#trendFill)"
+                      name="Reports"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Section>
 
-        {/* Status Distribution */}
-        <div className="rounded-xl border border-line bg-surface p-5 lg:col-span-2">
-          <p className="text-xs font-medium text-fg">Distribution by status</p>
-          <div className="mt-4 flex flex-col gap-3">
-            {loading
-              ? STATUSES.map((s) => <Skeleton key={s} className="h-4 w-full" />)
-              : STATUSES.map((s) => {
-                  const count = counts[s] ?? 0;
-                  return (
-                    <div key={s} className="flex items-center gap-3 text-xs">
-                      <span className="w-24 shrink-0 text-muted">{STATUS_LABEL[s]}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-fg/[0.08]">
-                        <div
-                          className="h-full rounded-full bg-accent"
-                          style={{ width: `${(count / maxStatusCount) * 100}%` }}
-                        />
+          <Section delay={0.12} className="rounded-[20px] border border-line bg-surface p-6 lg:col-span-2">
+            <h2 className="text-[13px] font-medium text-fg">By status</h2>
+            <div className="mt-5 flex flex-col gap-3.5">
+              {loading
+                ? STATUSES.map((s) => <Skeleton key={s} className="h-3 w-full" />)
+                : STATUSES.map((s) => {
+                    const count = counts[s] ?? 0;
+                    return (
+                      <div key={s} className="flex items-center gap-3 text-[12px]">
+                        <span className="w-[86px] shrink-0 text-fg2">{STATUS_LABEL[s]}</span>
+                        <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-hover">
+                          <motion.div
+                            className={`h-full rounded-full ${STATUS_BAR[s]}`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(count / maxStatusCount) * 100}%` }}
+                            transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
+                          />
+                        </div>
+                        <span className="tnum w-6 shrink-0 text-right font-mono text-[12px] text-fg">
+                          {count}
+                        </span>
                       </div>
-                      <span className="w-6 shrink-0 text-right tabular-nums text-fg font-mono">{count}</span>
-                    </div>
-                  );
-                })}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Reports List */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-fg">Recent Crash Reports</h2>
-          <Link
-            href="/dashboard/crash-reports"
-            className="flex items-center gap-1 text-xs text-muted hover:text-fg transition-colors"
-          >
-            <span>View all</span>
-            <ArrowUpRight size={12} />
-          </Link>
-        </div>
-
-        <div className="rounded-xl border border-line bg-surface overflow-hidden">
-          {loading ? (
-            <div className="p-4">
-              <SkeletonRows rows={5} cols={4} />
+                    );
+                  })}
             </div>
-          ) : recent.length === 0 ? (
-            <p className="p-8 text-center text-xs text-muted">No crash reports recorded yet.</p>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-line bg-fg/[0.02] text-[11px] font-medium tracking-wider text-muted uppercase">
-                  <th className="px-5 py-3">Report Title</th>
-                  <th className="px-5 py-3">Platform</th>
-                  <th className="px-5 py-3">Severity</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Reported</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {recent.slice(0, 6).map((report) => (
-                  <tr
-                    key={report.id}
-                    onClick={() => router.push(`/dashboard/crash-reports/${report.id}`)}
-                    className="cursor-pointer transition-colors hover:bg-fg/[0.03]"
-                  >
-                    <td className="max-w-md truncate px-5 py-3.5">
-                      <span className="font-medium text-fg hover:underline">{report.title}</span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <PlatformBadge platform={report.platform} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <SeverityBadge severity={report.severity} />
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge status={report.status} />
-                    </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap text-muted text-[11px]">
-                      {new Date(report.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          </Section>
         </div>
-      </div>
-    </main>
-  );
-}
 
-function StatTile({
-  label,
-  value,
-  description,
-  loading,
-  icon: Icon,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  description: string;
-  loading: boolean;
-  icon: any;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-5 transition-all ${
-        highlight
-          ? "border-amber-500/30 bg-amber-500/5"
-          : "border-line bg-surface"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted">{label}</span>
-        <Icon size={14} className={highlight ? "text-amber-500 dark:text-amber-400" : "text-muted"} />
+        <Section delay={0.18} className="mt-10">
+          <div className="mb-3.5 flex items-baseline justify-between">
+            <h2 className="display text-[22px] text-fg">Recent reports</h2>
+            <Link
+              href="/dashboard/crash-reports"
+              className="pressable inline-flex items-center gap-1 text-[13px] text-fg2 hover:text-fg"
+            >
+              <span>View all</span>
+              <ArrowUpRight size={13} strokeWidth={STROKE} />
+            </Link>
+          </div>
+
+          <div className="overflow-hidden rounded-[20px] border border-line bg-surface">
+            {loading ? (
+              <SkeletonRows rows={5} cols={4} />
+            ) : recent.length === 0 ? (
+              <div className="flex flex-col items-center px-8 py-16 text-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-[13px] border border-line bg-hover">
+                  <Bug size={17} strokeWidth={STROKE} className="text-fg3" />
+                </span>
+                <p className="mt-4 text-[15px] text-fg">No reports yet</p>
+                <p className="mt-1.5 max-w-[320px] text-[13px] leading-relaxed text-fg3">
+                  Crashes submitted from the iOS and Android apps land here. You can also file one
+                  by hand.
+                </p>
+                <Link
+                  href="/dashboard/crash-reports/new"
+                  className="pressable mt-5 inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line px-4 text-[13px] font-medium text-fg hover:bg-hover"
+                >
+                  <Plus size={14} strokeWidth={2} />
+                  <span>File a report</span>
+                </Link>
+              </div>
+            ) : (
+              // Below roughly 1200px the five columns stop fitting. Scrolling
+              // the table beats truncating the date column into nothing.
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left">
+                <thead>
+                  <tr className="border-b border-line">
+                    <th className="eyebrow px-5 py-3 font-normal">Report</th>
+                    <th className="eyebrow px-5 py-3 font-normal">Platform</th>
+                    <th className="eyebrow px-5 py-3 font-normal">Severity</th>
+                    <th className="eyebrow px-5 py-3 font-normal">Status</th>
+                    <th className="eyebrow px-5 py-3 text-right font-normal">Reported</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line-subtle">
+                  {recent.slice(0, 6).map((report) => (
+                    <tr
+                      key={report.id}
+                      onClick={() => router.push(`/dashboard/crash-reports/${report.id}`)}
+                      className="cursor-pointer transition-colors hover:bg-hover"
+                    >
+                      <td className="max-w-[260px] truncate px-5 py-4 text-[13px] font-medium text-fg xl:max-w-md">
+                        {report.title}
+                      </td>
+                      <td className="px-5 py-4">
+                        <PlatformBadge platform={report.platform} />
+                      </td>
+                      <td className="px-5 py-4">
+                        <SeverityBadge severity={report.severity} />
+                      </td>
+                      <td className="px-5 py-4">
+                        <StatusBadge status={report.status} />
+                      </td>
+                      <td className="tnum whitespace-nowrap px-5 py-4 text-right font-mono text-[12px] text-fg3">
+                        {new Date(report.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            )}
+          </div>
+        </Section>
       </div>
-      {loading ? (
-        <Skeleton className="mt-2 h-7 w-20" />
-      ) : (
-        <p className="mt-2 font-mono text-2xl font-semibold text-fg">{value}</p>
-      )}
-      <p className="mt-1 text-[11px] text-muted">{description}</p>
-    </div>
+    </MotionConfig>
   );
 }
