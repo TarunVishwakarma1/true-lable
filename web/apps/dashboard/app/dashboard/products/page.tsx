@@ -149,8 +149,8 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-line">
               {items.map((product) => (
                 <tr
-                  key={product.barcode}
-                  onClick={() => router.push(`/dashboard/products/${product.barcode}`)}
+                  key={product.id}
+                  onClick={() => router.push(`/dashboard/products/${product.id}`)}
                   className="cursor-pointer transition-colors hover:bg-fg/[0.03]"
                 >
                   <td className="max-w-[260px] px-5 py-3.5">
