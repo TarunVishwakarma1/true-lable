@@ -4,7 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Activity, BookOpen, Bug, CircleUser, LayoutGrid, LogOut, Package, Users } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  Bug,
+  CircleUser,
+  LayoutGrid,
+  LogOut,
+  Package,
+  Users,
+} from "lucide-react";
 import { ThemeToggle } from "@repo/ui/theme-toggle";
 import { useAuth } from "../../lib/auth-context";
 import { Skeleton } from "../components/skeleton";
@@ -30,59 +39,69 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (loading || !profile) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg">
-        <div className="flex items-center gap-2">
-          <Image src="/brand/logo-light.png" alt="" width={128} height={128} className="h-7 w-7 rounded-md dark:hidden" />
-          <Image src="/brand/logo-dark.png" alt="" width={128} height={128} className="hidden h-7 w-7 rounded-md dark:block" />
-          <span className="font-mono text-sm font-medium tracking-tight text-fg">
-            True<span className="text-accent">Label</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <Skeleton className="h-3 w-3 rounded-full" />
-          <span>Loading workspace…</span>
-        </div>
+      <main className="flex min-h-screen items-center justify-center bg-bg text-fg">
+        <Skeleton className="h-8 w-8 rounded-full" />
       </main>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-line px-4 py-5">
-        <div className="flex items-center gap-2 px-2">
-          <Image src="/brand/logo-light.png" alt="" width={128} height={128} className="h-6 w-6 rounded-md dark:hidden" />
-          <Image src="/brand/logo-dark.png" alt="" width={128} height={128} className="hidden h-6 w-6 rounded-md dark:block" />
-          <span className="font-mono text-[13px] font-medium tracking-tight text-fg">
+    <div className="flex min-h-screen bg-bg text-fg">
+      {/* Sidebar */}
+      <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-bg px-4 py-5">
+        {/* Brand Header */}
+        <Link href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-1">
+          <Image
+            src="/brand/logo-light.png"
+            alt="TrueLabel"
+            width={24}
+            height={24}
+            className="h-6 w-6 rounded-md dark:hidden"
+          />
+          <Image
+            src="/brand/logo-dark.png"
+            alt="TrueLabel"
+            width={24}
+            height={24}
+            className="hidden h-6 w-6 rounded-md dark:block"
+          />
+          <span className="font-mono text-sm font-semibold tracking-tight text-fg">
             True<span className="text-accent">Label</span>
           </span>
-        </div>
+        </Link>
 
-        <nav className="mt-8 flex flex-col gap-0.5">
+        {/* Navigation Links */}
+        <nav className="mt-6 flex flex-col gap-1">
           {LINKS.map((link) => {
             const active =
-              link.href === "/dashboard" ? pathname === link.href : pathname.startsWith(link.href);
+              link.href === "/dashboard"
+                ? pathname === link.href
+                : pathname.startsWith(link.href);
             const Icon = link.icon;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
-                  active ? "bg-fg/[0.06] text-fg" : "text-muted hover:bg-fg/[0.04] hover:text-fg"
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+                  active
+                    ? "bg-fg/[0.08] text-fg font-semibold shadow-xs"
+                    : "text-muted hover:bg-fg/[0.04] hover:text-fg"
                 }`}
               >
-                <Icon size={16} strokeWidth={2} />
-                {link.label}
+                <Icon size={15} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-fg" : "text-muted"} />
+                <span>{link.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line px-2 pt-4">
-          <div className="min-w-0">
-            <p className="truncate text-sm text-fg">{profile.name}</p>
-            <p className="truncate text-xs text-muted capitalize">{profile.role}</p>
+        {/* User Footer */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-4">
+          <div className="min-w-0 pl-1">
+            <p className="truncate text-xs font-medium text-fg">{profile.name}</p>
+            <p className="truncate text-[11px] text-muted capitalize">{profile.role}</p>
           </div>
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center gap-1">
             <div className="scale-75">
               <ThemeToggle />
             </div>
@@ -91,16 +110,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 logout();
                 router.replace("/login");
               }}
+              title="Sign out"
               aria-label="Sign out"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/[0.06] hover:text-fg"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-fg/[0.08] hover:text-fg"
             >
-              <LogOut size={15} />
+              <LogOut size={14} />
             </button>
           </div>
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">{children}</div>
+      {/* Main Content Pane */}
+      <div className="min-w-0 flex-1 overflow-auto bg-bg text-fg">{children}</div>
     </div>
   );
 }

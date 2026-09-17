@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Globe2, Loader2, Package, Search } from "lucide-react";
 import { VerifiedBadge } from "../../components/badges";
 import { SkeletonRows } from "../../components/skeleton";
 import { api, type Product } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 
 export default function ProductsPage() {
   const { token } = useAuth();
@@ -52,73 +52,126 @@ export default function ProductsPage() {
   }, [token, verified, debouncedQ, offset]);
 
   return (
-    <main className="mx-auto max-w-5xl px-8 py-10">
-      <div>
-        <h1 className="text-xl font-medium text-fg">Products</h1>
-        <p className="mt-1 text-sm text-muted">{total} total</p>
+    <main className="mx-auto max-w-6xl px-8 py-8">
+      {/* Title Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">Products</h1>
+          <p className="mt-1 text-xs text-muted">
+            {total} items in verified food catalog
+          </p>
+        </div>
       </div>
 
+      {/* Filter Bar */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+        {/* Verification Status Pill Filter */}
+        <div className="flex items-center gap-1 rounded-full border border-line bg-surface p-0.5">
+          <button
+            onClick={() => {
+              setOffset(0);
+              setVerified("");
+            }}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+              verified === ""
+                ? "bg-fg text-bg shadow-xs"
+                : "text-muted hover:text-fg"
+            }`}
+          >
+            All products
+          </button>
+          <button
+            onClick={() => {
+              setOffset(0);
+              setVerified("true");
+            }}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+              verified === "true"
+                ? "bg-fg text-bg shadow-xs"
+                : "text-muted hover:text-fg"
+            }`}
+          >
+            Verified only
+          </button>
+          <button
+            onClick={() => {
+              setOffset(0);
+              setVerified("false");
+            }}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+              verified === "false"
+                ? "bg-fg text-bg shadow-xs"
+                : "text-muted hover:text-fg"
+            }`}
+          >
+            Unverified
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative ml-auto">
+          <Search size={12} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, brand, barcode…"
-            className="h-8 w-64 rounded-md border border-line bg-surface pr-7 pl-7 text-xs text-fg outline-none placeholder:text-muted/60 focus:border-accent"
+            placeholder="Search barcode, product name, brand…"
+            className="h-8 w-64 rounded-full border border-line bg-surface pr-8 pl-8 text-xs text-fg placeholder:text-muted/60 outline-none transition-colors focus:border-accent"
           />
           {(loading || isSearching) && (
-            <Loader2 size={13} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 animate-spin text-muted" />
+            <Loader2 size={12} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 animate-spin text-muted" />
           )}
         </div>
-        <select
-          value={verified}
-          onChange={(e) => {
-            setOffset(0);
-            setVerified(e.target.value as "" | "true" | "false");
-          }}
-          aria-label="Verified"
-          className="h-8 rounded-md border border-line bg-surface px-2.5 text-xs text-fg outline-none focus:border-accent"
-        >
-          <option value="">All products</option>
-          <option value="true">Verified only</option>
-          <option value="false">Unverified only</option>
-        </select>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-line">
+      {/* Catalog Table */}
+      <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface">
         {loading ? (
-          <SkeletonRows rows={8} cols={5} />
+          <SkeletonRows rows={8} cols={6} />
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-rose-500">{error}</p>
         ) : items.length === 0 ? (
-          <p className="p-10 text-center text-sm text-muted">No products match these filters.</p>
+          <div className="p-12 text-center">
+            <Package size={24} className="mx-auto text-muted" />
+            <p className="mt-2 text-sm text-muted">No products match these filters.</p>
+          </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-line text-left text-xs text-muted">
-                <th className="px-4 py-2.5 font-medium">Name</th>
-                <th className="px-4 py-2.5 font-medium">Brand</th>
-                <th className="px-4 py-2.5 font-medium">Barcode</th>
-                <th className="px-4 py-2.5 font-medium">Country</th>
-                <th className="px-4 py-2.5 font-medium">Verified</th>
+              <tr className="border-b border-line bg-fg/[0.02] text-[11px] font-medium tracking-wider text-muted uppercase">
+                <th className="px-5 py-3">Product</th>
+                <th className="px-5 py-3">Brand</th>
+                <th className="px-5 py-3">Category</th>
+                <th className="px-5 py-3">Country</th>
+                <th className="px-5 py-3">Verification</th>
+                <th className="px-5 py-3">Updated</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {items.map((product) => (
                 <tr
-                  key={product.id}
-                  onClick={() => router.push(`/dashboard/products/${product.id}`)}
-                  className="cursor-pointer border-b border-line last:border-0 hover:bg-fg/[0.03]"
+                  key={product.barcode}
+                  onClick={() => router.push(`/dashboard/products/${product.barcode}`)}
+                  className="cursor-pointer transition-colors hover:bg-fg/[0.03]"
                 >
-                  <td className="max-w-xs truncate px-4 py-3 text-fg">{product.product_name}</td>
-                  <td className="max-w-[160px] truncate px-4 py-3 text-muted">{product.brand ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-xs text-muted">{product.barcode}</span>
+                  <td className="max-w-[260px] px-5 py-3.5">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-fg hover:underline">{product.product_name}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted">-o- {product.barcode}</p>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-muted uppercase">{product.country}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5 text-muted">{product.brand ?? "—"}</td>
+                  <td className="px-5 py-3.5 text-muted">{product.category ?? "—"}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-line bg-fg/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-wider text-fg">
+                      <Globe2 size={10} className="text-muted" />
+                      {product.country}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
                     <VerifiedBadge verified={product.verified} />
+                  </td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-muted text-[11px]">
+                    {new Date(product.updated_at).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
@@ -127,23 +180,26 @@ export default function ProductsPage() {
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-sm">
+      {/* Pagination Controls */}
+      <div className="mt-4 flex items-center justify-between text-xs text-muted">
         <button
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
           disabled={offset === 0 || loading}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-fg transition-colors hover:border-fg/20 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          ← Previous
+          <ChevronLeft size={13} />
+          <span>Previous</span>
         </button>
-        <span className="text-xs text-muted">
-          {total === 0 ? 0 : offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+        <span className="text-[11px] text-muted font-mono">
+          Showing {total === 0 ? 0 : offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
         </span>
         <button
           onClick={() => setOffset(offset + PAGE_SIZE)}
           disabled={offset + PAGE_SIZE >= total || loading}
-          className="text-muted transition-colors hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-fg transition-colors hover:border-fg/20 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          Next →
+          <span>Next</span>
+          <ChevronRight size={13} />
         </button>
       </div>
     </main>
