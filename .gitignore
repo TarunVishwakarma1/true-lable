@@ -32,3 +32,8 @@ k8s/**/secrets.yaml
 !*.tfvars.example
 backend.hcl
 !backend.hcl.example
+.claude
+.aider-desk
+.agents
+.vscode
+skills-lock.json
