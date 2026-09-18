@@ -92,16 +92,16 @@ export default function DashboardHome() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="mx-auto max-w-[1180px] px-8 pb-20 pt-10">
+      <div className="mx-auto max-w-[1180px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-10">
         {/* The headline is the state of the queue, not a greeting. The greeting
             is still there, just sized like the aside it actually is. */}
         <Section className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="eyebrow">Welcome back{firstName ? `, ${firstName}` : ""}</p>
             {loading ? (
-              <Skeleton className="mt-3 h-11 w-[340px]" />
+              <Skeleton className="mt-3 h-11 w-full max-w-[340px]" />
             ) : (
-              <h1 className="display mt-2.5 text-[42px] text-fg">
+              <h1 className="display mt-2.5 text-[30px] text-fg sm:text-[36px] lg:text-[42px]">
                 {open > 0 ? (
                   <>
                     <span className="tnum">{open}</span>{" "}
@@ -113,7 +113,7 @@ export default function DashboardHome() {
               </h1>
             )}
             {loading ? (
-              <Skeleton className="mt-3 h-3 w-[220px]" />
+              <Skeleton className="mt-3 h-3 w-full max-w-[220px]" />
             ) : (
               <p className="mt-2.5 text-[13px] text-fg2">
                 <span className="tnum font-medium text-fg">{total}</span> logged all time ·{" "}
@@ -228,7 +228,7 @@ export default function DashboardHome() {
             {loading ? (
               <SkeletonRows rows={5} cols={4} />
             ) : recent.length === 0 ? (
-              <div className="flex flex-col items-center px-8 py-16 text-center">
+              <div className="flex flex-col items-center px-6 py-16 text-center">
                 <span className="flex h-11 w-11 items-center justify-center rounded-[13px] border border-line bg-hover">
                   <Bug size={17} strokeWidth={STROKE} className="text-fg3" />
                 </span>

@@ -33,6 +33,7 @@ const csp = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(!process.env.VERCEL && { output: "standalone" }),
+  allowedDevOrigins: ['172.20.10.4'],
   async headers() {
     return [
       {

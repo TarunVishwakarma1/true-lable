@@ -69,7 +69,7 @@ export default function CrashReportDetailPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-8 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Skeleton className="h-4 w-32" />
         <div className="mt-6 flex flex-col gap-8 lg:flex-row">
           <div className="min-w-0 flex-1 space-y-4">
@@ -94,7 +94,7 @@ export default function CrashReportDetailPage() {
 
   if (error || !report) {
     return (
-      <main className="mx-auto max-w-6xl px-8 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-sm text-rose-500">
           {error ?? "Crash report not found."}
         </div>
@@ -106,7 +106,7 @@ export default function CrashReportDetailPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <div className="flex items-center justify-between">
         <BackLink />
         <div className="flex items-center gap-2">

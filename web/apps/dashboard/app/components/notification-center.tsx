@@ -164,7 +164,7 @@ export function NotificationCenter() {
 
       {/* Popover Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-line bg-bg p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] sm:w-96 rounded-2xl border border-line bg-bg p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line px-2 pb-2.5">
             <div className="flex items-center gap-2">

@@ -34,7 +34,7 @@ export default function UserDetailPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-4xl px-8 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Skeleton className="h-4 w-28" />
         <div className="mt-6 space-y-4">
           <Skeleton className="h-8 w-2/3" />
@@ -47,7 +47,7 @@ export default function UserDetailPage() {
 
   if (error || !user) {
     return (
-      <main className="mx-auto max-w-4xl px-8 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-sm text-rose-500">
           {error ?? "User not found."}
         </div>
@@ -62,7 +62,7 @@ export default function UserDetailPage() {
     user.plus_since !== null && (user.plus_expires_at === null || new Date(user.plus_expires_at) > new Date());
 
   return (
-    <main className="mx-auto max-w-4xl px-8 py-8">
+    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <BackLink />
 
       {/* Header Info */}

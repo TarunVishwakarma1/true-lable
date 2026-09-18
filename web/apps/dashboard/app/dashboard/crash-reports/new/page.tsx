@@ -54,7 +54,7 @@ export default function NewCrashReportPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-8 py-10">
+    <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <Link
         href="/dashboard/crash-reports"
         className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
@@ -71,7 +71,7 @@ export default function NewCrashReportPage() {
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <FormError message={error} />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Platform">
             <SelectField disabled={loading} value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
               {PLATFORMS.map((p) => (
@@ -110,7 +110,7 @@ export default function NewCrashReportPage() {
           />
         </Field>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="App version" optional>
             <TextField disabled={loading} value={appVersion} onChange={(e) => setAppVersion(e.target.value)} />
           </Field>

@@ -92,7 +92,7 @@ const GROUPS: { title: string; links: ResourceLink[] }[] = [
 
 export default function ResourcesPage() {
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       {/* Title Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-fg">Resources</h1>

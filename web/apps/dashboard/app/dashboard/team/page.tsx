@@ -118,9 +118,9 @@ export default function TeamPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       {/* Title Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-fg">Team</h1>
           <p className="mt-1 text-xs text-muted">
@@ -232,7 +232,8 @@ export default function TeamPage() {
         ) : error ? (
           <p className="p-6 text-sm text-rose-500">{error}</p>
         ) : (
-          <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px] text-left text-xs">
             <thead>
               <tr className="border-b border-line bg-fg/[0.02] text-[11px] font-medium tracking-wider text-muted uppercase">
                 <th className="px-5 py-3">Member</th>
@@ -417,6 +418,7 @@ export default function TeamPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </main>
